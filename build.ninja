@@ -1,0 +1,27 @@
+cc     = clang
+ld     = ld.lld
+cflags = -Wall -IGL/include -Ideps/include -O3
+ldflags = -O3 -Ldeps/lib -lglfw3 -luser32 -lgdi32 -lopengl32 -lshell32 -lmsvcrt -Xlinker /NODEFAULTLIB:libcmt -mwindows
+
+rule rc
+  command = llvm-rc $in
+
+rule compile
+  command = $cc $cflags -c $in -o $out
+
+rule link
+  command = $cc $ldflags $in -o $out
+
+rule embed
+  command = $ld -r -o $out -z noexecstack --format=binary $in
+
+build NESpy.res: rc rc/NESpy.rc
+build ini.o: compile src/ini.c
+build glad.o: compile src/glad.c
+build lodepng.o: compile src/lodepng.c
+build main.o: compile src/main.c
+build inputs.o: compile src/inputs.c
+build embeds.o: compile rc/embeds.s
+build NESpy.exe: link embeds.o ini.o glad.o lodepng.o inputs.o main.o NESpy.res
+
+default NESpy.exe

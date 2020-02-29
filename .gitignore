@@ -1,0 +1,8 @@
+/.ninja_*
+/*.o
+/*.exe
+/deps
+/*.d
+/*.res
+/*.log
+*.DS_Store
