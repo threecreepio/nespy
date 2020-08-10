@@ -178,7 +178,7 @@ LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
             downKeys |= NESKEY_T;
             newInput |= NESKEY_T;
         } else {
-            return 0;
+            return CallNextHookEx(0, nCode, wParam, lParam);
         }
     }
 
@@ -219,11 +219,14 @@ LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
             newInput &= 0xFF ^ NESKEY_T;
             downKeys &= 0xFF ^ NESKEY_T;
         } else {
-            return 0;
+            return CallNextHookEx(0, nCode, wParam, lParam);
         }
     }
 
-    if (newInput == inputState) return 0;
+    if (newInput == inputState) {
+        return CallNextHookEx(0, nCode, wParam, lParam);
+    }
+    
     inputState = currentInputs = newInput;
 
     struct timeb end;
@@ -233,7 +236,7 @@ LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
     printf("%3.2f\n", diff);
     print_inputstate(newInput);
     currentTimer = end;
-    return 0;
+    return CallNextHookEx(0, nCode, wParam, lParam);
 }
 
 int InputReadSetting(void* user, const char* section, const char* name, const char* value) {
