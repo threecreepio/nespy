@@ -54,14 +54,14 @@ static const char* fragment_shader_text =
 "void main()\n"
 "{\n"
 "    fragment = texture(tex0, uv);\n"
-"    if (0x01 == (keys & 0x01)) { fragment += (texture(tex1, uv) * texture(tex1, uv).a);}"
-"    if (0x02 == (keys & 0x02)) { fragment += (texture(tex2, uv) * texture(tex2, uv).a);}"
-"    if (0x04 == (keys & 0x04)) { fragment += (texture(tex3, uv) * texture(tex3, uv).a);}"
-"    if (0x08 == (keys & 0x08)) { fragment += (texture(tex4, uv) * texture(tex4, uv).a);}"
-"    if (0x10 == (keys & 0x10)) { fragment += (texture(tex5, uv) * texture(tex5, uv).a);}"
-"    if (0x20 == (keys & 0x20)) { fragment += (texture(tex6, uv) * texture(tex6, uv).a);}"
-"    if (0x40 == (keys & 0x40)) { fragment += (texture(tex7, uv) * texture(tex7, uv).a);}"
-"    if (0x80 == (keys & 0x80)) { fragment += (texture(tex8, uv) * texture(tex8, uv).a);}"
+"    if (0x01 == (keys & 0x01) && texture(tex1, uv).a > 0) { fragment = (texture(tex1, uv));}"
+"    if (0x02 == (keys & 0x02) && texture(tex2, uv).a > 0) { fragment = (texture(tex2, uv));}"
+"    if (0x04 == (keys & 0x04) && texture(tex3, uv).a > 0) { fragment = (texture(tex3, uv));}"
+"    if (0x08 == (keys & 0x08) && texture(tex4, uv).a > 0) { fragment = (texture(tex4, uv));}"
+"    if (0x10 == (keys & 0x10) && texture(tex5, uv).a > 0) { fragment = (texture(tex5, uv));}"
+"    if (0x20 == (keys & 0x20) && texture(tex6, uv).a > 0) { fragment = (texture(tex6, uv));}"
+"    if (0x40 == (keys & 0x40) && texture(tex7, uv).a > 0) { fragment = (texture(tex7, uv));}"
+"    if (0x80 == (keys & 0x80) && texture(tex8, uv).a > 0) { fragment = (texture(tex8, uv));}"
 "}\n";
 
 static void GlfwErrorCallback(int error, const char* description)
