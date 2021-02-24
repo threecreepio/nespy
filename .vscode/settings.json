@@ -5,6 +5,8 @@
         "cmath": "c",
         "glad.h": "c",
         "inputs.h": "c",
-        "nespy.h": "c"
+        "nespy.h": "c",
+        "stdlib.h": "c",
+        "dinput.h": "c"
     }
 }

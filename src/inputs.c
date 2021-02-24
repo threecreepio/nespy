@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "nespy.h"
 #include "inputs.h"
+#include "dinput.h"
 
 #define NESKEY_UP 0x10
 #define NESKEY_DOWN 0x20
@@ -22,10 +23,13 @@
 
 HANDLE nes_comport;
 char inputtype[50] = "NES";
-char comport[50] = "\0";
+char comport[50] = "";
 float nes_framemultiplier = 1;
 float framerate = 16.6393322f;
+float joy_framerate = 16.6393322f;
+float joy_pollinterval = 1;
 int downKeys = 0;
+char joy_device[256] = "";
 int inputState = 0;
 int repeatedInputs = 0;
 struct timeb currentTimer;
@@ -43,6 +47,132 @@ void print_inputstate(int newInput) {
     );
 }
 
+
+LPDIRECTINPUT8 di;
+LPDIRECTINPUTDEVICE8 joypad;
+DIJOYSTATE2 joypadstate;
+DIDEVCAPS joypadcaps;
+byte btnstate[32 + 4];
+
+int JOYConfigure() {
+    HRESULT hr;
+    if (FAILED(hr = IDirectInputDevice8_SetDataFormat(joypad, &c_dfDIJoystick2))) {
+        return hr;
+    }
+    if (FAILED(hr = IDirectInputDevice8_SetCooperativeLevel(joypad, NULL, DISCL_NONEXCLUSIVE | DISCL_BACKGROUND))) {
+        return hr;
+    }
+    joypadcaps.dwSize = sizeof(DIDEVCAPS);
+    joypadcaps.dwButtons = 8;
+    if (FAILED(hr = IDirectInputDevice8_GetCapabilities(joypad, &joypadcaps))) {
+        return hr;
+    }
+}
+
+int JOYPoll(void) {
+    HRESULT hr;
+    hr = IDirectInputDevice8_Poll(joypad);
+    if (FAILED(hr)) {
+        while (1) {
+            hr = IDirectInputDevice8_Acquire(joypad);
+            if (hr == DIERR_INPUTLOST) {
+                printf("input lost... %d\n", hr);
+                continue;
+            }
+            if ((hr == DIERR_INVALIDPARAM) || (hr == DIERR_NOTINITIALIZED)) {
+                printf("failed to access joypad\n", hr);
+                return -1;
+            }
+            if (FAILED(hr)) {
+                printf("couldnt acquire joypad: %d\n", hr);
+                return -1;
+            }
+            break;
+        }
+        hr = IDirectInputDevice8_Poll(joypad);
+        if (FAILED(hr)) {
+            printf("couldnt poll joypad: %d\n", hr);
+            return -1;
+        }
+    }
+    IDirectInputDevice8_GetDeviceState(joypad, sizeof(DIJOYSTATE2), &joypadstate);
+    return 0;
+}
+
+int joy_up, joy_down, joy_left, joy_right, joy_a, joy_b, joy_start, joy_select;
+DWORD WINAPI JOYThread(void* data) {
+    HANDLE updateEvent = CreateEvent(NULL,FALSE,FALSE,"Update");
+    if (updateEvent == NULL) {
+        printf("failed to create event..\n");
+        return -2;
+    }
+    IDirectInputDevice8_SetEventNotification(joypad, updateEvent);
+    byte buttons[32 + 4];
+    while (1) {
+        //Sleep(joy_pollinterval);
+        if (JOYPoll() != 0) {
+            exit(-2);
+        }
+        int dpad = joypadstate.rgdwPOV[0];
+        for (int i=0; i<32; ++i) buttons[i] = joypadstate.rgbButtons[i];
+        buttons[32] = dpad != -1 && (dpad > 27000 || dpad < 9000);
+        buttons[33] = dpad != -1 && (dpad < 18000 && dpad > 0);
+        buttons[34] = dpad != -1 && (dpad < 27000 && dpad > 9000);
+        buttons[35] = dpad != -1 && (dpad > 18000);
+
+        int result = 0;
+        result = result | (buttons[joy_a]      > 0 ? 0b00000001 : 0);
+        result = result | (buttons[joy_b]      > 0 ? 0b00000010 : 0);
+        result = result | (buttons[joy_start]  > 0 ? 0b00000100 : 0);
+        result = result | (buttons[joy_select] > 0 ? 0b00001000 : 0);
+        result = result | (buttons[joy_up]     > 0 ? 0b00010000 : 0);
+        result = result | (buttons[joy_down]   > 0 ? 0b00100000 : 0);
+        result = result | (buttons[joy_left]   > 0 ? 0b01000000 : 0);
+        result = result | (buttons[joy_right]  > 0 ? 0b10000000 : 0);
+        if (result == currentInputs) continue;
+        currentInputs = result;
+        struct timeb end;
+        ftime(&end);
+        float diff = (float) ((1000.0 * (end.time - currentTimer.time) + (end.millitm - currentTimer.millitm)) / joy_framerate);
+        printf("%3.2f\n", diff);
+        print_inputstate(result);
+        currentTimer = end;
+    }
+}
+
+BOOL CALLBACK JOYEnumJoypad(const DIDEVICEINSTANCE *did, void *ctx) {
+    if (strcmp(joy_device, did->tszInstanceName) == 0) {
+        fprintf(logfile, "using device %s\n", did->tszInstanceName);
+        HRESULT result = IDirectInput8_CreateDevice(di, &did->guidInstance, &joypad, NULL);
+        if (FAILED(result)) {
+            return DIENUM_CONTINUE;
+        }
+        return DIENUM_STOP;
+    }
+    fprintf(logfile, "skipping device %s\n", did->tszInstanceName);
+    return DIENUM_CONTINUE;
+}
+
+int JOYInit() {
+    joypad = 0;
+    if (FAILED(DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION, &IID_IDirectInput8, &di, NULL))) {
+        return -1;
+    }
+    if (FAILED(IDirectInput8_EnumDevices(di, DI8DEVCLASS_GAMECTRL, JOYEnumJoypad, GetModuleHandle(NULL), DIEDFL_ATTACHEDONLY))) {
+        return -2;
+    }
+    if (0 == joypad) { return -3; }
+    JOYConfigure();
+    JOYPoll();
+    HANDLE thread = CreateThread(NULL, 0, JOYThread, NULL, 0, NULL);
+    if (!thread) {
+        fprintf(logfile, "could not spawn thread\n");
+        return -4;
+    }
+    return 0;
+}
+
+
 int NESInit();
 DWORD WINAPI NESThread(void* data) {
     uint8_t nextByte;
@@ -50,7 +180,7 @@ DWORD WINAPI NESThread(void* data) {
     while (1) {
             if (!ReadFile( comport, &nextByte, sizeof(nextByte), &readlen, NULL)) {
                 Sleep(2500);
-                NESInit();
+                exit(-2);
             }
             if (!readlen) continue;
             if (currentInputs == nextByte) {
@@ -239,31 +369,50 @@ LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
     return CallNextHookEx(0, nCode, wParam, lParam);
 }
 
+int KBDInit() {
+    ftime(&currentTimer);
+    SetWindowsHookEx(WH_KEYBOARD_LL, KBDCallback, NULL, 0);
+    return 0;
+}
+
 int InputReadSetting(void* user, const char* section, const char* name, const char* value) {
     #define SETTING(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
     if (SETTING("NESpy", "inputtype")) snprintf(inputtype, sizeof(inputtype), "%s", value);
     if (SETTING("NES", "comport")) snprintf(comport, sizeof(comport), "%s", value);
     if (SETTING("NES", "framemultiplier")) nes_framemultiplier = strtof(value, NULL);
+
+    if (SETTING("JOYPAD", "fps")) joy_framerate = 1000.0f / strtof(value, NULL);
+    if (SETTING("JOYPAD", "device")) snprintf(joy_device, sizeof(joy_device), "%s", value);
+    if (SETTING("JOYPAD", "pollinterval")) joy_pollinterval = strtof(value, NULL);
+    if (SETTING("JOYPAD", "up")) joy_up = joynameToKeyCode(value);
+    if (SETTING("JOYPAD", "down")) joy_down = joynameToKeyCode(value);
+    if (SETTING("JOYPAD", "left")) joy_left = joynameToKeyCode(value);
+    if (SETTING("JOYPAD", "right")) joy_right = joynameToKeyCode(value);
+    if (SETTING("JOYPAD", "a")) joy_a = joynameToKeyCode(value);
+    if (SETTING("JOYPAD", "b")) joy_b = joynameToKeyCode(value);
+    if (SETTING("JOYPAD", "start")) joy_start = joynameToKeyCode(value);
+    if (SETTING("JOYPAD", "select")) joy_select = joynameToKeyCode(value);
+    
     if (SETTING("Keyboard", "fps")) framerate = 1000.0f / strtof(value, NULL);
     if (SETTING("Keyboard", "lrmode")) kbd_lrmode = strtol(value, NULL, 10);
     if (SETTING("Keyboard", "print_input")) kbd_printinput = strtol(value, NULL, 10);
-    if (SETTING("Keyboard", "up")) kbd_up = strtol(value, NULL, 16);
-    if (SETTING("Keyboard", "down")) kbd_down = strtol(value, NULL, 16);
-    if (SETTING("Keyboard", "left")) kbd_left = strtol(value, NULL, 16);
-    if (SETTING("Keyboard", "right")) kbd_right = strtol(value, NULL, 16);
-    if (SETTING("Keyboard", "a")) kbd_a = strtol(value, NULL, 16);
-    if (SETTING("Keyboard", "b")) kbd_b = strtol(value, NULL, 16);
-    if (SETTING("Keyboard", "start")) kbd_start = strtol(value, NULL, 16);
-    if (SETTING("Keyboard", "select")) kbd_select = strtol(value, NULL, 16);
+    if (SETTING("Keyboard", "up")) kbd_up = keynameToKeyCode(value);
+    if (SETTING("Keyboard", "down")) kbd_down = keynameToKeyCode(value);
+    if (SETTING("Keyboard", "left")) kbd_left = keynameToKeyCode(value);
+    if (SETTING("Keyboard", "right")) kbd_right = keynameToKeyCode(value);
+    if (SETTING("Keyboard", "a")) kbd_a = keynameToKeyCode(value);
+    if (SETTING("Keyboard", "b")) kbd_b = keynameToKeyCode(value);
+    if (SETTING("Keyboard", "start")) kbd_start = keynameToKeyCode(value);
+    if (SETTING("Keyboard", "select")) kbd_select = keynameToKeyCode(value);
     return 0;
 }
 
 int InputStartup() {
     if (strcmp(inputtype, "NES") == 0) {
         return NESInit();
+    } else if (strcmp(inputtype, "JOYPAD") == 0) {
+        return JOYInit();
     } else {
-        ftime(&currentTimer);
-        SetWindowsHookEx(WH_KEYBOARD_LL, KBDCallback, NULL, 0);
-        return 0;
+        return KBDInit();
     }
 }

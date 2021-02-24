@@ -1,7 +1,7 @@
 cc     = clang
 ld     = ld.lld
 cflags = -Wall -IGL/include -Ideps/include -O3
-ldflags = -O3 -Ldeps/lib -lglfw3 -luser32 -lgdi32 -lopengl32 -lshell32 -lmsvcrt -Xlinker /NODEFAULTLIB:libcmt -mwindows
+ldflags = -O3 -Ldeps/lib -lglfw3 -luser32 -ldxguid -ldinput8 -lgdi32 -lopengl32 -lshell32 -lmsvcrt -Xlinker /NODEFAULTLIB:libcmt -mwindows
 
 rule rc
   command = llvm-rc $in
@@ -21,7 +21,8 @@ build glad.o: compile src/glad.c
 build lodepng.o: compile src/lodepng.c
 build main.o: compile src/main.c
 build inputs.o: compile src/inputs.c
+build keycodes.o: compile src/keycodes.c
 build embeds.o: compile rc/embeds.s
-build NESpy.exe: link embeds.o ini.o glad.o lodepng.o inputs.o main.o NESpy.res
+build NESpy.exe: link embeds.o ini.o glad.o lodepng.o inputs.o keycodes.o main.o NESpy.res
 
 default NESpy.exe
