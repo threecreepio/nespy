@@ -1,11 +1,13 @@
 
 #include <windows.h>
+#include <tchar.h>
 #include <sys\timeb.h>
 #include <stdio.h>
 #include <stdint.h>
 #include "nespy.h"
 #include "inputs.h"
 #include "dinput.h"
+int joynameToKeyCode(const char *input);
 
 #define NESKEY_UP 0x10
 #define NESKEY_DOWN 0x20
@@ -67,6 +69,7 @@ int JOYConfigure() {
     if (FAILED(hr = IDirectInputDevice8_GetCapabilities(joypad, &joypadcaps))) {
         return hr;
     }
+    return 0;
 }
 
 int JOYPoll(void) {
@@ -76,22 +79,22 @@ int JOYPoll(void) {
         while (1) {
             hr = IDirectInputDevice8_Acquire(joypad);
             if (hr == DIERR_INPUTLOST) {
-                printf("input lost... %d\n", hr);
+                printf("input lost... %ld\n", hr);
                 continue;
             }
             if ((hr == DIERR_INVALIDPARAM) || (hr == DIERR_NOTINITIALIZED)) {
-                printf("failed to access joypad\n", hr);
+                printf("failed to access joypad: %ld\n", hr);
                 return -1;
             }
             if (FAILED(hr)) {
-                printf("couldnt acquire joypad: %d\n", hr);
+                printf("couldnt acquire joypad: %ld\n", hr);
                 return -1;
             }
             break;
         }
         hr = IDirectInputDevice8_Poll(joypad);
         if (FAILED(hr)) {
-            printf("couldnt poll joypad: %d\n", hr);
+            printf("couldnt poll joypad: %ld\n", hr);
             return -1;
         }
     }
@@ -100,6 +103,7 @@ int JOYPoll(void) {
 }
 
 int joy_up, joy_down, joy_left, joy_right, joy_a, joy_b, joy_start, joy_select;
+int joy_debug = 0;
 DWORD WINAPI JOYThread(void* data) {
     HANDLE updateEvent = CreateEvent(NULL,FALSE,FALSE,"Update");
     if (updateEvent == NULL) {
@@ -155,7 +159,7 @@ BOOL CALLBACK JOYEnumJoypad(const DIDEVICEINSTANCE *did, void *ctx) {
 
 int JOYInit() {
     joypad = 0;
-    if (FAILED(DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION, &IID_IDirectInput8, &di, NULL))) {
+    if (FAILED(DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION, &IID_IDirectInput8, (void**) &di, NULL))) {
         return -1;
     }
     if (FAILED(IDirectInput8_EnumDevices(di, DI8DEVCLASS_GAMECTRL, JOYEnumJoypad, GetModuleHandle(NULL), DIEDFL_ATTACHEDONLY))) {
@@ -178,7 +182,7 @@ DWORD WINAPI NESThread(void* data) {
     uint8_t nextByte;
     DWORD readlen;
     while (1) {
-            if (!ReadFile( comport, &nextByte, sizeof(nextByte), &readlen, NULL)) {
+            if (!ReadFile( nes_comport, &nextByte, sizeof(nextByte), &readlen, NULL)) {
                 Sleep(2500);
                 exit(-2);
             }
@@ -198,15 +202,16 @@ DWORD WINAPI NESThread(void* data) {
 int NESInit() {
     nes_comport = CreateFile(comport, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
     if (nes_comport == INVALID_HANDLE_VALUE) {
-        fprintf(logfile, "could not connect to nes controller\n");
+        fprintf(logfile, "could not connect to nes controller on %s\n", comport);
         return -1;
     }
 
     DCB param = { 0 };
     param.DCBlength = sizeof(param);
-    int status = GetCommState(comport, &param);
-    if (!status) {
-        fprintf(logfile, "could not read nes controller state\n");
+    int status = GetCommState(nes_comport, &param);
+    if (status == 0) {
+        unsigned long errn = GetLastError();
+        fprintf(logfile, "could not read nes controller state on %s - status %ld\n", comport, errn);
         CloseHandle(comport);
         return -1;
     }
@@ -215,18 +220,19 @@ int NESInit() {
     param.ByteSize = 8;
     param.StopBits = ONESTOPBIT;
     param.Parity   = NOPARITY;
-    SetCommState(comport, &param);
-    status = SetCommMask(comport, EV_RXCHAR);
-    if (!status) {
-        fprintf(logfile, "could not set nes controller state\n");
-        CloseHandle(comport);
+    SetCommState(nes_comport, &param);
+    status = SetCommMask(nes_comport, EV_RXCHAR);
+    if (status == 0) {
+        unsigned long errn = GetLastError();
+        fprintf(logfile, "could not set nes controller state on %s - status %ld\n", comport, status);
+        CloseHandle(nes_comport);
         return -1;
     }
 
     HANDLE thread = CreateThread(NULL, 0, NESThread, NULL, 0, NULL);
     if (!thread) {
         fprintf(logfile, "could not spawn thread\n");
-        CloseHandle(comport);
+        CloseHandle(nes_comport);
         return -2;
     }
 
@@ -234,7 +240,7 @@ int NESInit() {
 }
 
 int kbd_lrmode, kbd_up, kbd_down, kbd_left, kbd_right, kbd_a, kbd_b, kbd_start, kbd_select;
-int kbd_printinput = 0;
+int kbd_debug = 0;
 LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
     KBDLLHOOKSTRUCT kbdStruct = *((KBDLLHOOKSTRUCT*)lParam);
     int newInput = inputState;
@@ -314,7 +320,7 @@ LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
 
     
     if (wParam == WM_KEYUP) {
-        if (kbd_printinput) {
+        if (kbd_debug) {
             printf("Key: %x\n", (int) kbdStruct.vkCode);
         }
         if (kbdStruct.vkCode == kbd_up) {
@@ -383,6 +389,7 @@ int InputReadSetting(void* user, const char* section, const char* name, const ch
 
     if (SETTING("JOYPAD", "fps")) joy_framerate = 1000.0f / strtof(value, NULL);
     if (SETTING("JOYPAD", "device")) snprintf(joy_device, sizeof(joy_device), "%s", value);
+    if (SETTING("JOYPAD", "debug")) joy_debug = strtol(value, NULL, 10);
     if (SETTING("JOYPAD", "pollinterval")) joy_pollinterval = strtof(value, NULL);
     if (SETTING("JOYPAD", "up")) joy_up = joynameToKeyCode(value);
     if (SETTING("JOYPAD", "down")) joy_down = joynameToKeyCode(value);
@@ -395,7 +402,7 @@ int InputReadSetting(void* user, const char* section, const char* name, const ch
     
     if (SETTING("Keyboard", "fps")) framerate = 1000.0f / strtof(value, NULL);
     if (SETTING("Keyboard", "lrmode")) kbd_lrmode = strtol(value, NULL, 10);
-    if (SETTING("Keyboard", "print_input")) kbd_printinput = strtol(value, NULL, 10);
+    if (SETTING("Keyboard", "debug")) kbd_debug = strtol(value, NULL, 10);
     if (SETTING("Keyboard", "up")) kbd_up = keynameToKeyCode(value);
     if (SETTING("Keyboard", "down")) kbd_down = keynameToKeyCode(value);
     if (SETTING("Keyboard", "left")) kbd_left = keynameToKeyCode(value);

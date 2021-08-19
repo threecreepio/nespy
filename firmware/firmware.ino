@@ -2,9 +2,9 @@
 #define WAIT_FALLING_EDGE( pin ) while( !PIN_READ(pin) ); while( PIN_READ(pin) );
 #define WAIT_LEADING_EDGE( pin ) while( PIN_READ(pin) ); while( !PIN_READ(pin) );
 
-#define PIN_LATCH           3 // BLUE
-#define PIN_DATA            4 // RED
-#define PIN_CLOCK           6 // ORANGE
+#define PIN_LATCH           3 // BLACK
+#define PIN_DATA            4 // WHITE
+#define PIN_CLOCK           6 // GRAY
 
 void setup()
 {
@@ -29,8 +29,6 @@ void loop()
         nextValue += (!PIN_READ(PIN_DATA)) ? (1 << i) : 0;
     }
     interrupts();
-    //if (lastSent != nextValue) {
-      lastSent = nextValue;
-      Serial.write(nextValue);
-    //}
+    lastSent = nextValue;
+    Serial.write(nextValue);
 }

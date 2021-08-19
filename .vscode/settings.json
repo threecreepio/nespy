@@ -7,6 +7,8 @@
         "inputs.h": "c",
         "nespy.h": "c",
         "stdlib.h": "c",
-        "dinput.h": "c"
+        "dinput.h": "c",
+        "timeb.h": "c",
+        "windows.h": "c"
     }
 }
