@@ -2,9 +2,10 @@
 #define WAIT_FALLING_EDGE( pin ) while( !PIN_READ(pin) ); while( PIN_READ(pin) );
 #define WAIT_LEADING_EDGE( pin ) while( PIN_READ(pin) ); while( !PIN_READ(pin) );
 
-#define PIN_LATCH           3 // BLACK
-#define PIN_DATA            4 // WHITE
-#define PIN_CLOCK           6 // GRAY
+                              // NES    // SNES
+#define PIN_LATCH           3 // BLACK  // ORANGE
+#define PIN_DATA            4 // WHITE  // RED
+#define PIN_CLOCK           6 // GRAY   // BROWN
 
 void setup()
 {
@@ -18,17 +19,23 @@ void setup()
     bitClear(ADCSRA, ADPS2);
 }
 
-uint8_t lastSent = 0;
+uint8_t bits = 8;
 void loop()
 {
     noInterrupts();
     WAIT_FALLING_EDGE(PIN_LATCH);
-    uint8_t nextValue = 0;
-    for (uint8_t i=0; i<8; ++i) {
+    uint16_t nextValue = 0;
+    for (uint8_t i=0; i<bits; ++i) {
         WAIT_FALLING_EDGE(PIN_CLOCK);
         nextValue += (!PIN_READ(PIN_DATA)) ? (1 << i) : 0;
     }
     interrupts();
-    lastSent = nextValue;
-    Serial.write(nextValue);
+    Serial.write(nextValue >> 8);
+    Serial.write(nextValue & 0xFF);
+    if (Serial.available()) {
+        switch (Serial.read()) {
+            case 0: bits = 8; break;
+            case 1: bits = 16; break;
+        }
+    }
 }

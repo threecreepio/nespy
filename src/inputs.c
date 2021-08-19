@@ -9,14 +9,18 @@
 #include "dinput.h"
 int joynameToKeyCode(const char *input);
 
-#define NESKEY_UP 0x10
-#define NESKEY_DOWN 0x20
-#define NESKEY_LEFT 0x40
-#define NESKEY_RIGHT 0x80
-#define NESKEY_A 0x01
-#define NESKEY_B 0x02
-#define NESKEY_S 0x04
-#define NESKEY_T 0x08
+#define NESKEY_UP    0x010
+#define NESKEY_DOWN  0x020
+#define NESKEY_LEFT  0x040
+#define NESKEY_RIGHT 0x080
+#define NESKEY_A 0x001
+#define NESKEY_B 0x002
+#define NESKEY_S 0x004
+#define NESKEY_T 0x008
+#define NESKEY_SNES_A 0x100
+#define NESKEY_SNES_X 0x200
+#define NESKEY_SNES_L 0x400
+#define NESKEY_SNES_R 0x800
 
 #define KBDLR_NONE 0
 #define KBDLR_BIZHAWK 1
@@ -24,6 +28,7 @@ int joynameToKeyCode(const char *input);
 #define KBDLR_MESEN 3
 
 HANDLE nes_comport;
+int currentInputs;
 char inputtype[50] = "NES";
 char comport[50] = "";
 float framerate = 16.6393322f;
@@ -33,11 +38,38 @@ char joy_device[256] = "";
 int inputState = 0;
 int repeatedInputs = 0;
 struct timeb currentTimer;
-int nes_suminputs = 1;
+int nes_suminputs = 0;
 int nes_ignoreextrareads = 1;
 
+int sequence = 0;
+int nextWord = 0;
+int snesmode = 0;
+FILE *inputlog;
+
+void print_snesinputstate(int newInput) {
+    fprintf(inputlog, "%s%s%s%s%s%s%s%s%s%s%s%s",
+        (newInput & NESKEY_UP) == NESKEY_UP ? "U" : " ",
+        (newInput & NESKEY_DOWN) == NESKEY_DOWN ? "D" : " ",
+        (newInput & NESKEY_LEFT) == NESKEY_LEFT ? "L" : " ",
+        (newInput & NESKEY_RIGHT) == NESKEY_RIGHT ? "R" : " ",
+        (newInput & NESKEY_S) == NESKEY_S ? "S" : " ",
+        (newInput & NESKEY_T) == NESKEY_T ? "T" : " ",
+        (newInput & NESKEY_B) == NESKEY_B ? "B" : " ",
+        (newInput & NESKEY_A) == NESKEY_A ? "Y" : " ",
+
+        (newInput & NESKEY_SNES_L) == NESKEY_SNES_L ? "l" : " ",
+        (newInput & NESKEY_SNES_R) == NESKEY_SNES_R ? "r" : " ",
+        (newInput & NESKEY_SNES_X) == NESKEY_SNES_X ? "X" : " ",
+        (newInput & NESKEY_SNES_A) == NESKEY_SNES_A ? "A" : " "
+    );
+}
+
 void print_inputstate(int newInput) {
-    printf("%s%s%s%s%s%s%s%s",
+    if (snesmode == 1) {
+        print_snesinputstate(newInput);
+        return;
+    }
+    fprintf(inputlog, "%s%s%s%s%s%s%s%s",
         (newInput & NESKEY_UP) == NESKEY_UP ? "U" : " ",
         (newInput & NESKEY_DOWN) == NESKEY_DOWN ? "D" : " ",
         (newInput & NESKEY_LEFT) == NESKEY_LEFT ? "L" : " ",
@@ -53,15 +85,23 @@ void logInputChangeNES(int nextByte) {
     struct timeb end;
     ftime(&end);
     float diff = (float) ((1000.0 * (end.time - currentTimer.time) + (end.millitm - currentTimer.millitm)) / framerate);
-    if (nes_ignoreextrareads && nextByte == currentInputs && diff < 0.05f) return;
-    if (currentInputs == nextByte) repeatedInputs += 1;
-    if (nextByte != currentInputs && nes_suminputs) {
-        printf(" : %d\n", repeatedInputs);
-        repeatedInputs = 1;
-    }
-    if (nextByte != currentInputs || !nes_suminputs) {
-        print_inputstate(nextByte);
-        if (!nes_suminputs) printf("\n");
+    if (diff > 0.1f) nextWord = 0;
+
+    if (nes_ignoreextrareads && diff > 0.01f && diff < 0.05f) return; // errant read
+    sequence = diff < 0.0095 ? 0 : 1;
+    if (sequence == 1) nextWord = 0;
+    nextWord |= nextByte << ((sequence) * 8);
+    if (sequence == 0) {
+        if (currentInputs == nextWord) repeatedInputs += 1;
+        if (nextWord != currentInputs && nes_suminputs) {
+            fprintf(inputlog, " : %d\n", repeatedInputs);
+            repeatedInputs = 1;
+        }
+        if (nextWord != currentInputs || !nes_suminputs) {
+            print_inputstate(nextWord);
+            if (!nes_suminputs) fprintf(inputlog, "\n");
+        }
+        currentInputs = nextWord;
     }
     currentTimer = end;
 }
@@ -120,6 +160,7 @@ int JOYPoll(void) {
 }
 
 int joy_up, joy_down, joy_left, joy_right, joy_a, joy_b, joy_start, joy_select;
+int joy_snes_l, joy_snes_r, joy_snes_a, joy_snes_x;
 int joy_debug = 0;
 DWORD WINAPI JOYThread(void* data) {
     HANDLE updateEvent = CreateEvent(NULL,FALSE,FALSE,"Update");
@@ -141,14 +182,18 @@ DWORD WINAPI JOYThread(void* data) {
         buttons[35] = dpad != -1 && (dpad > 18000);
 
         int result = 0;
-        result = result | (buttons[joy_a]      > 0 ? 0b00000001 : 0);
-        result = result | (buttons[joy_b]      > 0 ? 0b00000010 : 0);
-        result = result | (buttons[joy_start]  > 0 ? 0b00000100 : 0);
-        result = result | (buttons[joy_select] > 0 ? 0b00001000 : 0);
-        result = result | (buttons[joy_up]     > 0 ? 0b00010000 : 0);
-        result = result | (buttons[joy_down]   > 0 ? 0b00100000 : 0);
-        result = result | (buttons[joy_left]   > 0 ? 0b01000000 : 0);
-        result = result | (buttons[joy_right]  > 0 ? 0b10000000 : 0);
+        result = result | (buttons[joy_a]       > 0 ?     0b00000001 : 0);
+        result = result | (buttons[joy_b]       > 0 ?     0b00000010 : 0);
+        result = result | (buttons[joy_start]   > 0 ?     0b00000100 : 0);
+        result = result | (buttons[joy_select]  > 0 ?     0b00001000 : 0);
+        result = result | (buttons[joy_up]      > 0 ?     0b00010000 : 0);
+        result = result | (buttons[joy_down]    > 0 ?     0b00100000 : 0);
+        result = result | (buttons[joy_left]    > 0 ?     0b01000000 : 0);
+        result = result | (buttons[joy_right]   > 0 ?     0b10000000 : 0);
+        result = result | (buttons[joy_snes_a]  > 0 ?    0b100000000 : 0);
+        result = result | (buttons[joy_snes_x]  > 0 ?   0b1000000000 : 0);
+        result = result | (buttons[joy_snes_r]  > 0 ?  0b10000000000 : 0);
+        result = result | (buttons[joy_snes_l]  > 0 ? 0b100000000000 : 0);
         if (result == currentInputs) continue;
         currentInputs = result;
         struct timeb end;
@@ -208,13 +253,12 @@ DWORD WINAPI NESThread(void* data) {
             }
             if (!readlen) continue;
             logInputChangeNES(nextByte);
-            currentInputs = nextByte;
     }
     return 0;
 }
 
 int NESInit() {
-    nes_comport = CreateFile(comport, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+    nes_comport = CreateFile(comport, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
     if (nes_comport == INVALID_HANDLE_VALUE) {
         fprintf(logfile, "could not connect to nes controller on %s\n", comport);
         return -1;
@@ -243,6 +287,10 @@ int NESInit() {
         return -1;
     }
 
+    DWORD readlen;
+    uint8_t writeByte = snesmode ? 1 : 0;
+    WriteFile(nes_comport, &writeByte, sizeof(writeByte), &readlen, NULL);
+
     HANDLE thread = CreateThread(NULL, 0, NESThread, NULL, 0, NULL);
     if (!thread) {
         fprintf(logfile, "could not spawn thread\n");
@@ -254,6 +302,7 @@ int NESInit() {
 }
 
 int kbd_lrmode, kbd_up, kbd_down, kbd_left, kbd_right, kbd_a, kbd_b, kbd_start, kbd_select;
+int kbd_snes_l, kbd_snes_r, kbd_snes_a, kbd_snes_x;
 int kbd_debug = 0;
 LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
     KBDLLHOOKSTRUCT kbdStruct = *((KBDLLHOOKSTRUCT*)lParam);
@@ -264,52 +313,52 @@ LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
             downKeys |= NESKEY_UP;
             int islr = downKeys & NESKEY_DOWN;
             if (kbd_lrmode == KBDLR_BIZHAWK) {
-                newInput &= 0xFF ^ (NESKEY_UP | NESKEY_DOWN);
+                newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
             }
             if (kbd_lrmode == KBDLR_MESEN && islr) {
-                newInput &= 0xFF ^ NESKEY_DOWN;
+                newInput &= 0xFFFF ^ NESKEY_DOWN;
             }
             newInput |= NESKEY_UP;
             if (kbd_lrmode == KBDLR_FCEUX && islr) {
-                newInput &= 0xFF ^ (NESKEY_UP | NESKEY_DOWN);
+                newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
             }
         }
         else if (kbdStruct.vkCode == kbd_down) {
             downKeys |= NESKEY_DOWN;
             int islr = downKeys & NESKEY_UP;
             if (kbd_lrmode == KBDLR_BIZHAWK) {
-                newInput &= 0xFF ^ (NESKEY_UP | NESKEY_DOWN);
+                newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
             }
             if (kbd_lrmode == KBDLR_MESEN && islr) {}
             else newInput |= NESKEY_DOWN;
             if (kbd_lrmode == KBDLR_FCEUX && islr) {
-                newInput &= 0xFF ^ (NESKEY_UP | NESKEY_DOWN);
+                newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
             }
         }
         else if (kbdStruct.vkCode == kbd_left) {
             downKeys |= NESKEY_LEFT;
             int islr = downKeys & NESKEY_RIGHT;
             if (kbd_lrmode == KBDLR_BIZHAWK && islr) {
-                newInput &= 0xFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
+                newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
             }
             if (kbd_lrmode == KBDLR_MESEN && islr) {
-                newInput &= 0xFF ^ NESKEY_RIGHT;
+                newInput &= 0xFFFF ^ NESKEY_RIGHT;
             }
             newInput |= NESKEY_LEFT;
             if (kbd_lrmode == KBDLR_FCEUX && islr) {
-                newInput &= 0xFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
+                newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
             }
         }
         else if (kbdStruct.vkCode == kbd_right) {
             downKeys |= NESKEY_RIGHT;
             int islr = downKeys & NESKEY_LEFT;
             if (kbd_lrmode == KBDLR_BIZHAWK) {
-                newInput &= 0xFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
+                newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
             }
             if (kbd_lrmode == KBDLR_MESEN && islr) {}
             else newInput |= NESKEY_RIGHT;
             if (kbd_lrmode == KBDLR_FCEUX && islr) {
-                newInput &= 0xFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
+                newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
             }
         }
         else if (kbdStruct.vkCode == kbd_a) {
@@ -327,6 +376,22 @@ LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
         else if (kbdStruct.vkCode == kbd_start) {
             downKeys |= NESKEY_T;
             newInput |= NESKEY_T;
+        }
+        else if (kbdStruct.vkCode == kbd_snes_l) {
+            downKeys |= NESKEY_SNES_L;
+            newInput |= NESKEY_SNES_L;
+        }
+        else if (kbdStruct.vkCode == kbd_snes_r) {
+            downKeys |= NESKEY_SNES_R;
+            newInput |= NESKEY_SNES_R;
+        }
+        else if (kbdStruct.vkCode == kbd_snes_x) {
+            downKeys |= NESKEY_SNES_X;
+            newInput |= NESKEY_SNES_X;
+        }
+        else if (kbdStruct.vkCode == kbd_snes_a) {
+            downKeys |= NESKEY_SNES_A;
+            newInput |= NESKEY_SNES_A;
         } else {
             return CallNextHookEx(0, nCode, wParam, lParam);
         }
@@ -338,36 +403,52 @@ LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
             printf("Key: %x\n", (int) kbdStruct.vkCode);
         }
         if (kbdStruct.vkCode == kbd_up) {
-            newInput = (newInput & (0xFF ^ NESKEY_UP)) | (downKeys & NESKEY_DOWN);
-            downKeys &= 0xFF ^ NESKEY_UP;
+            newInput = (newInput & (0xFFFF ^ NESKEY_UP)) | (downKeys & NESKEY_DOWN);
+            downKeys &= 0xFFFF ^ NESKEY_UP;
         }
         else if (kbdStruct.vkCode == kbd_down) {
-            newInput = (newInput & (0xFF ^ NESKEY_DOWN)) | (downKeys & NESKEY_UP);
-            downKeys &= 0xFF ^ NESKEY_DOWN;
+            newInput = (newInput & (0xFFFF ^ NESKEY_DOWN)) | (downKeys & NESKEY_UP);
+            downKeys &= 0xFFFF ^ NESKEY_DOWN;
         }
         else if (kbdStruct.vkCode == kbd_left) {
-            newInput = (newInput & (0xFF ^ NESKEY_LEFT)) | (downKeys & NESKEY_RIGHT);
-            downKeys &= 0xFF ^ NESKEY_LEFT;
+            newInput = (newInput & (0xFFFF ^ NESKEY_LEFT)) | (downKeys & NESKEY_RIGHT);
+            downKeys &= 0xFFFF ^ NESKEY_LEFT;
         }
         else if (kbdStruct.vkCode == kbd_right) {
-            newInput = (newInput & (0xFF ^ NESKEY_RIGHT)) | (downKeys & NESKEY_LEFT);
-            downKeys &= 0xFF ^ NESKEY_RIGHT;
+            newInput = (newInput & (0xFFFF ^ NESKEY_RIGHT)) | (downKeys & NESKEY_LEFT);
+            downKeys &= 0xFFFF ^ NESKEY_RIGHT;
         }
         else if (kbdStruct.vkCode == kbd_a) {
-            newInput &= 0xFF ^ NESKEY_A;
-            downKeys &= 0xFF ^ NESKEY_A;
+            newInput &= 0xFFFF ^ NESKEY_A;
+            downKeys &= 0xFFFF ^ NESKEY_A;
         }
         else if (kbdStruct.vkCode == kbd_b) {
-            newInput &= 0xFF ^ NESKEY_B;
-            downKeys &= 0xFF ^ NESKEY_B;
+            newInput &= 0xFFFF ^ NESKEY_B;
+            downKeys &= 0xFFFF ^ NESKEY_B;
         }
         else if (kbdStruct.vkCode == kbd_select) {
-            newInput &= 0xFF ^ NESKEY_S;
-            downKeys &= 0xFF ^ NESKEY_S;
+            newInput &= 0xFFFF ^ NESKEY_S;
+            downKeys &= 0xFFFF ^ NESKEY_S;
         }
         else if (kbdStruct.vkCode == kbd_start) {
-            newInput &= 0xFF ^ NESKEY_T;
-            downKeys &= 0xFF ^ NESKEY_T;
+            newInput &= 0xFFFF ^ NESKEY_T;
+            downKeys &= 0xFFFF ^ NESKEY_T;
+        } 
+        else if (kbdStruct.vkCode == kbd_snes_l) {
+            newInput &= 0xFFFF ^ NESKEY_SNES_L;
+            downKeys &= 0xFFFF ^ NESKEY_SNES_L;
+        }
+        else if (kbdStruct.vkCode == kbd_snes_r) {
+            newInput &= 0xFFFF ^ NESKEY_SNES_R;
+            downKeys &= 0xFFFF ^ NESKEY_SNES_R;
+        }
+        else if (kbdStruct.vkCode == kbd_snes_x) {
+            newInput &= 0xFFFF ^ NESKEY_SNES_X;
+            downKeys &= 0xFFFF ^ NESKEY_SNES_X;
+        }
+        else if (kbdStruct.vkCode == kbd_snes_a) {
+            newInput &= 0xFFFF ^ NESKEY_SNES_A;
+            downKeys &= 0xFFFF ^ NESKEY_SNES_A;
         } else {
             return CallNextHookEx(0, nCode, wParam, lParam);
         }
@@ -398,6 +479,7 @@ int KBDInit() {
 int InputReadSetting(void* user, const char* section, const char* name, const char* value) {
     #define SETTING(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
     if (SETTING("NESpy", "inputtype")) snprintf(inputtype, sizeof(inputtype), "%s", value);
+    if (SETTING("NESpy", "snesmode")) snesmode = strtol(value, NULL, 10);
     if (SETTING("NES", "comport")) snprintf(comport, sizeof(comport), "%s", value);
     if (SETTING("NES", "ignoreextrareads")) nes_ignoreextrareads = strtol(value, NULL, 10);
     if (SETTING("NES", "suminputs")) nes_suminputs = strtol(value, NULL, 10);
@@ -413,7 +495,12 @@ int InputReadSetting(void* user, const char* section, const char* name, const ch
     if (SETTING("JOYPAD", "b")) joy_b = joynameToKeyCode(value);
     if (SETTING("JOYPAD", "start")) joy_start = joynameToKeyCode(value);
     if (SETTING("JOYPAD", "select")) joy_select = joynameToKeyCode(value);
-    
+    if (SETTING("JOYPAD", "snes_l")) joy_snes_l = joynameToKeyCode(value);
+    if (SETTING("JOYPAD", "snes_r")) joy_snes_r = joynameToKeyCode(value);
+    if (SETTING("JOYPAD", "snes_a")) joy_snes_a = joynameToKeyCode(value);
+    if (SETTING("JOYPAD", "snes_x")) joy_snes_x = joynameToKeyCode(value);
+
+
     if (SETTING("KEYBOARD", "fps")) framerate = 1000.0f / strtof(value, NULL);
     if (SETTING("KEYBOARD", "lrmode")) kbd_lrmode = strtol(value, NULL, 10);
     if (SETTING("KEYBOARD", "debug")) kbd_debug = strtol(value, NULL, 10);
@@ -425,6 +512,10 @@ int InputReadSetting(void* user, const char* section, const char* name, const ch
     if (SETTING("KEYBOARD", "b")) kbd_b = keynameToKeyCode(value);
     if (SETTING("KEYBOARD", "start")) kbd_start = keynameToKeyCode(value);
     if (SETTING("KEYBOARD", "select")) kbd_select = keynameToKeyCode(value);
+    if (SETTING("KEYBOARD", "snes_l")) kbd_snes_l = keynameToKeyCode(value);
+    if (SETTING("KEYBOARD", "snes_r")) kbd_snes_r = keynameToKeyCode(value);
+    if (SETTING("KEYBOARD", "snes_a")) kbd_snes_a = keynameToKeyCode(value);
+    if (SETTING("KEYBOARD", "snes_x")) kbd_snes_x = keynameToKeyCode(value);
     return 0;
 }
 

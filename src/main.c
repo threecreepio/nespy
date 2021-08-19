@@ -9,10 +9,17 @@
 #include "inputs.h"
 #include "nespy.h"
 
+#define INPUTS 12
+
+FILE *logfile;
 extern const uint8_t icon_bin[];
 extern const uint32_t icon_bin_size;
 
+int inputlogwindow = 0;
 uint32_t idlesleep = 1;
+char windowtitle[0x80] = "NESpy";
+char imagepath[0x80] = "images";
+char inputlogfile[0x100] = "images";
 
 struct VTexData { GLfloat pos[2]; GLfloat uv[2]; };
 static const struct VTexData vertices[] =
@@ -49,19 +56,27 @@ static const char* fragment_shader_text =
 "uniform sampler2D tex6;\n"
 "uniform sampler2D tex7;\n"
 "uniform sampler2D tex8;\n"
+"uniform sampler2D tex9;\n"
+"uniform sampler2D tex10;\n"
+"uniform sampler2D tex11;\n"
+"uniform sampler2D tex12;\n"
 "in vec2 uv;\n"
 "out vec4 fragment;\n"
 "void main()\n"
 "{\n"
 "    fragment = texture(tex0, uv);\n"
-"    if (0x01 == (keys & 0x01) && texture(tex1, uv).a > 0) { fragment = (texture(tex1, uv));}"
-"    if (0x02 == (keys & 0x02) && texture(tex2, uv).a > 0) { fragment = (texture(tex2, uv));}"
-"    if (0x04 == (keys & 0x04) && texture(tex3, uv).a > 0) { fragment = (texture(tex3, uv));}"
-"    if (0x08 == (keys & 0x08) && texture(tex4, uv).a > 0) { fragment = (texture(tex4, uv));}"
-"    if (0x10 == (keys & 0x10) && texture(tex5, uv).a > 0) { fragment = (texture(tex5, uv));}"
-"    if (0x20 == (keys & 0x20) && texture(tex6, uv).a > 0) { fragment = (texture(tex6, uv));}"
-"    if (0x40 == (keys & 0x40) && texture(tex7, uv).a > 0) { fragment = (texture(tex7, uv));}"
-"    if (0x80 == (keys & 0x80) && texture(tex8, uv).a > 0) { fragment = (texture(tex8, uv));}"
+"    if (0x001 == (keys & 0x001) && texture(tex1, uv).a > 0) { fragment = (texture(tex1, uv));}"
+"    if (0x002 == (keys & 0x002) && texture(tex2, uv).a > 0) { fragment = (texture(tex2, uv));}"
+"    if (0x004 == (keys & 0x004) && texture(tex3, uv).a > 0) { fragment = (texture(tex3, uv));}"
+"    if (0x008 == (keys & 0x008) && texture(tex4, uv).a > 0) { fragment = (texture(tex4, uv));}"
+"    if (0x010 == (keys & 0x010) && texture(tex5, uv).a > 0) { fragment = (texture(tex5, uv));}"
+"    if (0x020 == (keys & 0x020) && texture(tex6, uv).a > 0) { fragment = (texture(tex6, uv));}"
+"    if (0x040 == (keys & 0x040) && texture(tex7, uv).a > 0) { fragment = (texture(tex7, uv));}"
+"    if (0x080 == (keys & 0x080) && texture(tex8, uv).a > 0) { fragment = (texture(tex8, uv));}"
+"    if (0x100 == (keys & 0x100) && texture(tex9, uv).a > 0) { fragment = (texture(tex9, uv));}"
+"    if (0x200 == (keys & 0x200) && texture(tex10, uv).a > 0) { fragment = (texture(tex10, uv));}"
+"    if (0x400 == (keys & 0x400) && texture(tex11, uv).a > 0) { fragment = (texture(tex11, uv));}"
+"    if (0x800 == (keys & 0x800) && texture(tex12, uv).a > 0) { fragment = (texture(tex12, uv));}"
 "}\n";
 
 static void GlfwErrorCallback(int error, const char* description)
@@ -100,20 +115,30 @@ static int ReadSetting(void* user, const char* section, const char* name, const 
 {
     #define SETTING(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
     InputReadSetting(user, section, name, value);
-    if (SETTING("NESpy", "idlesleep")) {
-        idlesleep = strtol(value, NULL, 10);
-    }
+    if (SETTING("NESpy", "idlesleep")) idlesleep = strtol(value, NULL, 10);
+    if (SETTING("NESpy", "imagepath")) snprintf(imagepath, sizeof(imagepath), "%s", value);
+    if (SETTING("NESpy", "windowtitle")) snprintf(windowtitle, sizeof(windowtitle), "%s", value);
+    if (SETTING("NESpy", "inputlogwindow")) inputlogwindow = strtol(value, NULL, 10);
+    if (SETTING("NESpy", "inputlogfile")) snprintf(inputlogfile, sizeof(inputlogfile), "%s", value);
     return 0;
 }
 
 int main(int argc, char **argv)
 {
-    if (fopen_s(&logfile, "NESpy.log", "w")) {
+    ShowWindow(GetConsoleWindow(), SW_HIDE);
+
+    if (0 != fopen_s(&logfile, "NESpy.log", "w")) {
         logfile = stderr;
     }
 
-    ini_parse("NESpy.ini", ReadSetting, 0);
-    // ShowWindow(GetConsoleWindow(), SW_HIDE);
+    ini_parse(argc > 1 ? argv[1] : "NESpy.ini", ReadSetting, 0);
+
+    inputlog = stdout;
+    if (strnlen(inputlogfile, 0x100) > 0) {
+        if (0 != fopen_s(&inputlog, inputlogfile, "w")) {
+            inputlog = stdout;
+        }
+    }
 
     glfwSetErrorCallback(GlfwErrorCallback);
 
@@ -129,7 +154,7 @@ int main(int argc, char **argv)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(1, 1, "NESpy Controller", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1, 1, windowtitle, NULL, NULL);
     if (!window) {
         glfwTerminate();
         fprintf(logfile, "failed to create window\n");
@@ -187,19 +212,21 @@ int main(int argc, char **argv)
     glEnableVertexAttribArray(vuv_location);
     glVertexAttribPointer(vuv_location, 2, GL_FLOAT, GL_FALSE, sizeof(struct VTexData), (void*) offsetof(struct VTexData, uv));
 
-    GLuint textures[9];
     glUseProgram(program);
-    for (int i=0; i<9; ++i) {
+    GLuint textures[INPUTS+1];
+    for (int i=0; i<INPUTS+1; ++i) {
         char path[50];
         char attrib[50];
-        sprintf(path, "images/%i.png", i);
+        sprintf(path, "%s/%i.png", imagepath, i);
         sprintf(attrib, "tex%i", i);
 
         glActiveTexture(GL_TEXTURE0 + i);
         textures[i] = LoadTexture(path);
         if (textures[i] == 0) {
-            glfwTerminate();
-            return -1;
+            fprintf(stderr, "failed to load texture %i\n", i);
+            //glfwTerminate();
+            //return -1;
+            continue;
         }
 
         if (i == 0) {
@@ -230,12 +257,12 @@ int main(int argc, char **argv)
     uint8_t renderedControllerValue = 0xFF;
     glfwSwapInterval(0);
     while (!glfwWindowShouldClose(window)) {
-        if (currentInputs != renderedControllerValue) {
-            renderedControllerValue = currentInputs;
-            glUniform1i(keys_location, currentInputs);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            glFinish();
-        } else if (idlesleep) {
+        int current = currentInputs;
+        renderedControllerValue = current;
+        glUniform1i(keys_location, currentInputs);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glFinish();
+        if (idlesleep) {
             Sleep(idlesleep);
         }
         glfwPollEvents();

@@ -1,4 +1,6 @@
 #pragma once
 #include <stdio.h>
 
-FILE *logfile;
+extern int currentInputs;
+extern FILE *logfile;
+extern FILE *inputlog;
