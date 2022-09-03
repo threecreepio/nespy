@@ -14,6 +14,18 @@ In the images folder there is an image called "0.png" which is the base image th
 
 When the program starts it writes to an NESpy.log file with anything that might happen during runtime. If the program crashes, look there and hopefully it wrote something useful!
 
+## Building
+
+The project is Windows-only, and requires CMake and a C compiler (LLVM Clang, TDM GCC, Visual Studio.)
+
+https://cmake.org/download/
+
+Create a build subdirectory, and inside it write:
+
+cmake -DCMAKE_BUILD_TYPE=Release ..
+
+This will generate build files for your system. After that you'll want to use your C compiler to build the executable.
+
 Have fun!
 
 /threecreepio

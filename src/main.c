@@ -1,6 +1,6 @@
 #define LODEPNG_NO_COMPILE_ENCODER
 #define LODEPNG_NO_COMPILE_ERROR_TEXT
-#include <glad/glad.h>
+#include <glad/gl.h>
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <windows.h>
@@ -123,6 +123,42 @@ static int ReadSetting(void* user, const char* section, const char* name, const 
     return 0;
 }
 
+
+static void LoadIconResources(GLFWwindow *window) {
+    HGLOBAL     res_handle = NULL;
+    HRSRC       res;
+
+    // NOTE: providing g_hInstance is important, NULL might not work
+    res = FindResource(GetModuleHandle(NULL), "icon_png", RT_RCDATA);
+    if (!res) {
+        fprintf(stderr, "no icon found\n");
+        return;
+    }
+    res_handle = LoadResource(NULL, res);
+    if (!res_handle) {
+        fprintf(stderr, "could not load icon handle\n");
+        return;
+    }
+    unsigned char *file = (unsigned char*)LockResource(res_handle);
+    DWORD len = SizeofResource(NULL, res);
+
+    if (file == 0) {
+        fprintf(stderr, "could not lock resource\n");
+        return;
+    }
+    
+    uint8_t *icondat;
+    uint32_t width;
+    uint32_t height;
+    lodepng_decode32(&icondat, &width, &height, file, len);
+    
+    GLFWimage icons[1];
+    icons[0].pixels = icondat;
+    icons[0].width = width;
+    icons[0].height = height;
+    glfwSetWindowIcon(window, 1, icons);
+}
+
 int main(int argc, char **argv)
 {
     ShowWindow(GetConsoleWindow(), SW_HIDE);
@@ -162,21 +198,12 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    uint8_t *icondat;
-    uint32_t width;
-    uint32_t height;
-    lodepng_decode32(&icondat, &width, &height, icon_bin, icon_bin_size);
-    
-    GLFWimage icons[1];
-    icons[0].pixels = icondat;
-    icons[0].width = width;
-    icons[0].height = height;
-    glfwSetWindowIcon(window, 1, icons);
+    LoadIconResources(window);
 
     glfwSetKeyCallback(window, GlfwKeyCallback);
 
     glfwMakeContextCurrent(window);
-    if (!gladLoadGL()) {
+    if (!gladLoadGL(glfwGetProcAddress)) {
         fprintf(logfile, "failed to init gl context\n");
         fclose(logfile);
         return -1;
@@ -254,7 +281,7 @@ int main(int argc, char **argv)
         }
     }
 
-    uint8_t renderedControllerValue = 0xFF;
+    uint8_t renderedControllerValue;
     glfwSwapInterval(0);
     while (!glfwWindowShouldClose(window)) {
         int current = currentInputs;
