@@ -19,7 +19,6 @@ int inputlogwindow = 0;
 uint32_t idlesleep = 1;
 char windowtitle[0x80] = "NESpy";
 char imagepath[0x80] = "images";
-char inputlogfile[0x100] = "images";
 
 struct VTexData { GLfloat pos[2]; GLfloat uv[2]; };
 static const struct VTexData vertices[] =
@@ -118,8 +117,6 @@ static int ReadSetting(void* user, const char* section, const char* name, const 
     if (SETTING("NESpy", "idlesleep")) idlesleep = strtol(value, NULL, 10);
     if (SETTING("NESpy", "imagepath")) snprintf(imagepath, sizeof(imagepath), "%s", value);
     if (SETTING("NESpy", "windowtitle")) snprintf(windowtitle, sizeof(windowtitle), "%s", value);
-    if (SETTING("NESpy", "inputlogwindow")) inputlogwindow = strtol(value, NULL, 10);
-    if (SETTING("NESpy", "inputlogfile")) snprintf(inputlogfile, sizeof(inputlogfile), "%s", value);
     return 0;
 }
 
@@ -161,21 +158,12 @@ static void LoadIconResources(GLFWwindow *window) {
 
 int main(int argc, char **argv)
 {
-    ShowWindow(GetConsoleWindow(), SW_HIDE);
-
+    inputlog = stdout;
     if (0 != fopen_s(&logfile, "NESpy.log", "w")) {
         logfile = stderr;
     }
 
     ini_parse(argc > 1 ? argv[1] : "NESpy.ini", ReadSetting, 0);
-
-    inputlog = stdout;
-    if (strnlen(inputlogfile, 0x100) > 0) {
-        if (0 != fopen_s(&inputlog, inputlogfile, "w")) {
-            inputlog = stdout;
-        }
-    }
-
     glfwSetErrorCallback(GlfwErrorCallback);
 
     if (!glfwInit()) {
@@ -283,6 +271,7 @@ int main(int argc, char **argv)
 
     uint8_t renderedControllerValue;
     glfwSwapInterval(0);
+
     while (!glfwWindowShouldClose(window)) {
         int current = currentInputs;
         renderedControllerValue = current;

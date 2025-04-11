@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
-enable_language(C)
 
 project(NESpy)
+enable_language(C)
+
 include_directories(
     vendor/glad/include
     vendor/glfw/include

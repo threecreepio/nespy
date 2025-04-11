@@ -28,7 +28,7 @@ int joynameToKeyCode(const char *input);
 #define KBDLR_MESEN 3
 
 HANDLE nes_comport;
-int currentInputs;
+int currentInputs = -1;
 char inputtype[50] = "NES";
 char comport[50] = "";
 float framerate = 16.6393322f;
@@ -42,11 +42,10 @@ int nes_suminputs = 0;
 int nes_ignoreextrareads = 1;
 
 int sequence = 0;
-int nextWord = 0;
 int snesmode = 0;
 FILE *inputlog;
 
-void print_snesinputstate(int newInput) {
+void print_inputstate(int newInput) {
     fprintf(inputlog, "%s%s%s%s%s%s%s%s%s%s%s%s",
         (newInput & NESKEY_UP) == NESKEY_UP ? "U" : " ",
         (newInput & NESKEY_DOWN) == NESKEY_DOWN ? "D" : " ",
@@ -64,44 +63,21 @@ void print_snesinputstate(int newInput) {
     );
 }
 
-void print_inputstate(int newInput) {
-    if (snesmode == 1) {
-        print_snesinputstate(newInput);
-        return;
-    }
-    fprintf(inputlog, "%s%s%s%s%s%s%s%s",
-        (newInput & NESKEY_UP) == NESKEY_UP ? "U" : " ",
-        (newInput & NESKEY_DOWN) == NESKEY_DOWN ? "D" : " ",
-        (newInput & NESKEY_LEFT) == NESKEY_LEFT ? "L" : " ",
-        (newInput & NESKEY_RIGHT) == NESKEY_RIGHT ? "R" : " ",
-        (newInput & NESKEY_S) == NESKEY_S ? "S" : " ",
-        (newInput & NESKEY_T) == NESKEY_T ? "T" : " ",
-        (newInput & NESKEY_B) == NESKEY_B ? "B" : " ",
-        (newInput & NESKEY_A) == NESKEY_A ? "A" : " "
-    );
-}
-
-void logInputChangeNES(int nextByte) {
+void logInputChangeNES(int nextValue) {
+    uint8_t changed = currentInputs != nextValue;
+    currentInputs = nextValue;
     struct timeb end;
     ftime(&end);
     float diff = (float) ((1000.0 * (end.time - currentTimer.time) + (end.millitm - currentTimer.millitm)) / framerate);
-    if (diff > 0.1f) nextWord = 0;
-
     if (nes_ignoreextrareads && diff > 0.01f && diff < 0.05f) return; // errant read
-    sequence = diff < 0.0095 ? 0 : 1;
-    if (sequence == 1) nextWord = 0;
-    nextWord |= nextByte << ((sequence) * 8);
-    if (sequence == 0) {
-        if (currentInputs == nextWord) repeatedInputs += 1;
-        if (nextWord != currentInputs && nes_suminputs) {
-            fprintf(inputlog, " : %d\n", repeatedInputs);
-            repeatedInputs = 1;
-        }
-        if (nextWord != currentInputs || !nes_suminputs) {
-            print_inputstate(nextWord);
-            if (!nes_suminputs) fprintf(inputlog, "\n");
-        }
-        currentInputs = nextWord;
+    if (!changed) repeatedInputs += 1;
+    if (changed && nes_suminputs) {
+        fprintf(inputlog, " : %d\n", repeatedInputs);
+        repeatedInputs = 1;
+    }
+    if (changed || !nes_suminputs) {
+        print_inputstate(nextValue);
+        if (!nes_suminputs) fprintf(inputlog, "\n");
     }
     currentTimer = end;
 }
@@ -241,18 +217,33 @@ int JOYInit() {
     return 0;
 }
 
-
 int NESInit();
 DWORD WINAPI NESThread(void* data) {
-    uint8_t nextByte;
-    DWORD readlen;
+  DWORD readlen = 0;
+    uint8_t b1, b2, b3, b4;
     while (1) {
-            if (!ReadFile( nes_comport, &nextByte, sizeof(nextByte), &readlen, NULL)) {
-                Sleep(2500);
-                exit(-2);
-            }
-            if (!readlen) continue;
-            logInputChangeNES(nextByte);
+        if (!ReadFile(nes_comport, &b1, 1, &readlen, NULL)) {
+            Sleep(2500);
+            exit(-2);
+        }
+        if (!readlen) continue;
+        if ((b1 & 0b10000000) == 0) continue; // wait for high bit set, indicates start of input.
+        if (!ReadFile(nes_comport, &b2, 1, &readlen, NULL)) {
+          Sleep(2500);
+          exit(-2);
+        }
+        if (!readlen) continue;
+        if (!ReadFile(nes_comport, &b3, 1, &readlen, NULL)) {
+          Sleep(2500);
+          exit(-2);
+        }
+        if (!readlen) continue;
+        if (!ReadFile(nes_comport, &b4, 1, &readlen, NULL)) {
+          Sleep(2500);
+          exit(-2);
+        }
+        if (!readlen) continue;
+        logInputChangeNES(b1 & 0xF | (b2 << 4) | (b3 << 8) | (b4 << 12));
     }
     return 0;
 }
@@ -286,10 +277,6 @@ int NESInit() {
         CloseHandle(nes_comport);
         return -1;
     }
-
-    DWORD readlen;
-    uint8_t writeByte = snesmode ? 1 : 0;
-    WriteFile(nes_comport, &writeByte, sizeof(writeByte), &readlen, NULL);
 
     HANDLE thread = CreateThread(NULL, 0, NESThread, NULL, 0, NULL);
     if (!thread) {

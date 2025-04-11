@@ -1,3 +1,7 @@
-/build
+/build*
 /*.log
 *.DS_Store
+/.vs
+/.vscode
+/CMakeCache.txt
+*.o
