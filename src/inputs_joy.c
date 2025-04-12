@@ -9,8 +9,8 @@ LPDIRECTINPUTDEVICE8 joypad;
 DIJOYSTATE2 joypadstate;
 DIDEVCAPS joypadcaps;
 byte btnstate[32 + 4];
-int joy_up, joy_down, joy_left, joy_right, joy_a, joy_b, joy_start, joy_select;
-int joy_snes_l, joy_snes_r, joy_snes_a, joy_snes_x;
+int joy_up = -1, joy_down = -1, joy_left = -1, joy_right = -1, joy_a = -1, joy_b = -1, joy_start = -1, joy_select = -1;
+int joy_snes_l = -1, joy_snes_r = -1, joy_snes_a = -1, joy_snes_x = -1;
 
 int JOYConfigure()
 {
@@ -69,34 +69,33 @@ DWORD WINAPI JOYThread(void* data)
         exit(-2);
     }
     IDirectInputDevice8_SetEventNotification(joypad, updateEvent);
-    byte buttons[32 + 4];
+    byte buttons[0x400];
     while (1) {
         if (JOYPoll() != 0) {
             exit(-2);
         }
         int dpad = joypadstate.rgdwPOV[0];
-        for (int i = 0; i < 32; ++i) buttons[i] = joypadstate.rgbButtons[i];
-        buttons[32] = dpad != -1 && (dpad > 27000 || dpad < 9000);
-        buttons[33] = dpad != -1 && (dpad < 18000 && dpad > 0);
-        buttons[34] = dpad != -1 && (dpad < 27000 && dpad > 9000);
-        buttons[35] = dpad != -1 && (dpad > 18000);
+        for (int i = 0; i < 128; ++i) buttons[i] = joypadstate.rgbButtons[i];
+        buttons[1020] = dpad != -1 && (dpad > 27000 || dpad < 9000);
+        buttons[1021] = dpad != -1 && (dpad < 18000 && dpad > 0);
+        buttons[1022] = dpad != -1 && (dpad < 27000 && dpad > 9000);
+        buttons[1023] = dpad != -1 && (dpad > 18000);
 
+        #define INP(bit, name) (name > -1 && buttons[name]) ? bit : 0;
         int result = 0;
-        result = result | (buttons[joy_a] > 0 ? 0b000000000001 : 0);
-        result = result | (buttons[joy_b] > 0 ? 0b000000000010 : 0);
-        result = result | (buttons[joy_start] > 0 ? 0b000000000100 : 0);
-        result = result | (buttons[joy_select] > 0 ? 0b000000001000 : 0);
-        result = result | (buttons[joy_up] > 0 ? 0b000000010000 : 0);
-        result = result | (buttons[joy_down] > 0 ? 0b000000100000 : 0);
-        result = result | (buttons[joy_left] > 0 ? 0b000001000000 : 0);
-        result = result | (buttons[joy_right] > 0 ? 0b000010000000 : 0);
-        result = result | (buttons[joy_snes_a] > 0 ? 0b000100000000 : 0);
-        result = result | (buttons[joy_snes_x] > 0 ? 0b001000000000 : 0);
-        result = result | (buttons[joy_snes_r] > 0 ? 0b010000000000 : 0);
-        result = result | (buttons[joy_snes_l] > 0 ? 0b100000000000 : 0);
+        result |= INP(0x001, joy_a);
+        result |= INP(0x002, joy_b);
+        result |= INP(0x004, joy_start);
+        result |= INP(0x008, joy_select);
+        result |= INP(0x010, joy_up);
+        result |= INP(0x020, joy_down);
+        result |= INP(0x040, joy_left);
+        result |= INP(0x080, joy_right);
+        result |= INP(0x100, joy_snes_a);
+        result |= INP(0x200, joy_snes_x);
+        result |= INP(0x400, joy_snes_r);
+        result |= INP(0x800, joy_snes_l);
         result = handleSOCD(result);
-
-        if (result == currentInputs) continue;
         updateInputState(result, 1);
     }
 }

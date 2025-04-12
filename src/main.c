@@ -183,7 +183,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         logfile = stderr;
     }
 
-    ini_parse(lpCmdLine[0] != 0 ? lpCmdLine : "NESpy.ini", ReadSetting, 0);
+    ini_parse(__argc >= 2 ? __argv[1] : "NESpy.ini", ReadSetting, 0);
     glfwSetErrorCallback(GlfwErrorCallback);
 
     // if we are logging to stdout, then a console window should be created

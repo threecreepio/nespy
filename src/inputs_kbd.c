@@ -7,8 +7,8 @@
 LPDIRECTINPUT8 kbd_di;
 LPDIRECTINPUTDEVICE8 keyboard;
 uint8_t keyboardstate[0x100];
-int kbd_up, kbd_down, kbd_left, kbd_right, kbd_a, kbd_b, kbd_start, kbd_select;
-int kbd_snes_l, kbd_snes_r, kbd_snes_a, kbd_snes_x;
+int kbd_up = -1, kbd_down = -1, kbd_left = -1, kbd_right = -1, kbd_a = -1, kbd_b = -1, kbd_start = -1, kbd_select = -1;
+int kbd_snes_l = -1, kbd_snes_r = -1, kbd_snes_a = -1, kbd_snes_x = -1;
 int kbd_debug = 0;
 int kbd_socd = SOCD_NEUTRAL;
 
@@ -74,19 +74,20 @@ DWORD WINAPI KBDThread(void* data)
                 }
             }
         }
+        #define INP(bit, name) (name > -1 && keyboardstate[name]) ? bit : 0;
         int result = 0;
-        result = result | (keyboardstate[kbd_a] > 0 ? 0b000000000001 : 0);
-        result = result | (keyboardstate[kbd_b] > 0 ? 0b000000000010 : 0);
-        result = result | (keyboardstate[kbd_start] > 0 ? 0b000000000100 : 0);
-        result = result | (keyboardstate[kbd_select] > 0 ? 0b000000001000 : 0);
-        result = result | (keyboardstate[kbd_up] > 0 ? 0b000000010000 : 0);
-        result = result | (keyboardstate[kbd_down] > 0 ? 0b000000100000 : 0);
-        result = result | (keyboardstate[kbd_left] > 0 ? 0b000001000000 : 0);
-        result = result | (keyboardstate[kbd_right] > 0 ? 0b000010000000 : 0);
-        result = result | (keyboardstate[kbd_snes_a] > 0 ? 0b000100000000 : 0);
-        result = result | (keyboardstate[kbd_snes_x] > 0 ? 0b001000000000 : 0);
-        result = result | (keyboardstate[kbd_snes_r] > 0 ? 0b010000000000 : 0);
-        result = result | (keyboardstate[kbd_snes_l] > 0 ? 0b100000000000 : 0);
+        result |= INP(0x001, kbd_a);
+        result |= INP(0x002, kbd_b);
+        result |= INP(0x004, kbd_start);
+        result |= INP(0x008, kbd_select);
+        result |= INP(0x010, kbd_up);
+        result |= INP(0x020, kbd_down);
+        result |= INP(0x040, kbd_left);
+        result |= INP(0x080, kbd_right);
+        result |= INP(0x100, kbd_snes_a);
+        result |= INP(0x200, kbd_snes_x);
+        result |= INP(0x400, kbd_snes_r);
+        result |= INP(0x800, kbd_snes_l);
         result = handleSOCD(result);
         updateInputState(result, 1);
     }

@@ -4,10 +4,10 @@
 
 int joynameToKeyCode(const char* input)
 {
-    if (0 == strcmp(input, "UP")) return 32;
-    if (0 == strcmp(input, "RIGHT")) return 33;
-    if (0 == strcmp(input, "DOWN")) return 34;
-    if (0 == strcmp(input, "LEFT")) return 35;
+    if (0 == strcmp(input, "UP")) return 1020;
+    if (0 == strcmp(input, "RIGHT")) return 1021;
+    if (0 == strcmp(input, "DOWN")) return 1022;
+    if (0 == strcmp(input, "LEFT")) return 1023;
     return strtol(input, 0, 10);
 }
 
