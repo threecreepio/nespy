@@ -17,8 +17,25 @@ extern const uint32_t icon_bin_size;
 
 int inputlogwindow = 0;
 uint32_t idlesleep = 1;
-char windowtitle[0x80] = "NESpy";
-char imagepath[0x80] = "images";
+char windowtitle[0x100] = "NESpy";
+char imagepath[0x200] = "images";
+char inputlogpath[0x200] = "";
+
+static int ReadSetting(void* user, const char* section, const char* name, const char* value)
+{
+    InputReadSetting(user, section, name, value);
+    if (SETTING("NESpy", "idlesleep"))
+        idlesleep = strtol(value, NULL, 10);
+    if (SETTING("NESpy", "imagepath"))
+        snprintf(imagepath, sizeof(imagepath), "%s", value);
+    if (SETTING("NESpy", "imagefolder"))
+        snprintf(imagepath, sizeof(imagepath), "%s", value);
+    if (SETTING("NESpy", "inputlog"))
+        snprintf(inputlogpath, sizeof(inputlogpath), "%s", value);
+    if (SETTING("NESpy", "windowtitle"))
+        snprintf(windowtitle, sizeof(windowtitle), "%s", value);
+    return 0;
+}
 
 struct VTexData
 {
@@ -114,20 +131,6 @@ GLuint LoadTexture(const char* path)
     return textureID;
 }
 
-static int ReadSetting(void* user, const char* section, const char* name, const char* value)
-{
-    InputReadSetting(user, section, name, value);
-    if (SETTING("NESpy", "idlesleep"))
-        idlesleep = strtol(value, NULL, 10);
-    if (SETTING("NESpy", "imagepath"))
-        snprintf(imagepath, sizeof(imagepath), "%s", value);
-    if (SETTING("NESpy", "imagefolder"))
-        snprintf(imagepath, sizeof(imagepath), "%s", value);
-    if (SETTING("NESpy", "windowtitle"))
-        snprintf(windowtitle, sizeof(windowtitle), "%s", value);
-    return 0;
-}
-
 static void LoadIconResources(GLFWwindow* window)
 {
     HGLOBAL res_handle = NULL;
@@ -173,15 +176,27 @@ void showErrorFrame(GLFWwindow* window)
     glfwPollEvents();
 }
 
-int main(int argc, char** argv)
+int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
     inputlog = stdout;
     if (0 != fopen_s(&logfile, "NESpy.log", "w")) {
         logfile = stderr;
     }
 
-    ini_parse(argc > 1 ? argv[1] : "NESpy.ini", ReadSetting, 0);
+    ini_parse(lpCmdLine[0] != 0 ? lpCmdLine : "NESpy.ini", ReadSetting, 0);
     glfwSetErrorCallback(GlfwErrorCallback);
+
+    // if we are logging to stdout, then a console window should be created
+    if (strcmp(inputlogpath, "stdout") == 0) {
+        AllocConsole();
+        freopen_s(&inputlog, "CONOUT$", "w", stdout);
+    // otherwise if we're logging to a file it should be opened
+    } else if (inputlogpath[0]) {
+        if (fopen_s(&inputlog, inputlogpath, "w")) {
+            // fallback if we can't create the file.
+            inputlog = stdout;
+        }
+    }
 
     if (!glfwInit()) {
         fprintf(logfile, "glfw init failed\n");
@@ -194,6 +209,7 @@ int main(int argc, char** argv)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(1, 1, windowtitle, NULL, NULL);
     if (!window) {
@@ -247,7 +263,7 @@ int main(int argc, char** argv)
     glUseProgram(program);
     GLuint textures[INPUTS + 1];
     for (int i = 0; i < INPUTS + 1; ++i) {
-        char path[50];
+        char path[0x200];
         char attrib[50];
         sprintf(path, "%s/%i.png", imagepath, i);
         sprintf(attrib, "tex%i", i);
@@ -256,8 +272,6 @@ int main(int argc, char** argv)
         textures[i] = LoadTexture(path);
         if (textures[i] == 0) {
             fprintf(stderr, "failed to load texture %i\n", i);
-            // glfwTerminate();
-            // return -1;
             continue;
         }
 
@@ -271,6 +285,8 @@ int main(int argc, char** argv)
         glBindTexture(GL_TEXTURE_2D, textures[i]);
         glUniform1i(glGetUniformLocation(program, attrib), i);
     }
+
+    glfwShowWindow(window);
 
     fprintf(logfile, "waiting for input subsystem init\n");
     int errcount = 0;

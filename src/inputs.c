@@ -12,6 +12,7 @@ int snesmode = 0;
 int inputErrorCode = 0;
 FILE* inputlog;
 struct timeb currentTimer;
+struct timeb changeTimer;
 
 int currentInputs;
 int repeatedInputs = 0;
@@ -34,24 +35,35 @@ int handleSOCD(int newInputs)
 
 void updateInputState(int newInput, int estimateframes)
 {
+    if (estimateframes) sumInputs = 1;
     uint8_t changed = currentInputs != newInput;
-    currentInputs = newInput;
     struct timeb now;
     ftime(&now);
     float diff = (float)((1000.0 * (now.time - currentTimer.time) + (now.millitm - currentTimer.millitm)) / framerate);
     if (diff < 0.05f) {
         return; // double read
     }
-    if (estimateframes && diff < 1.0f) return;
+    currentInputs = newInput;
     currentTimer = now;
 
     if (!changed) {
         repeatedInputs += 1;
+        return;
     }
+
+    float repeatTime = 0.0f;
+    if (changed && estimateframes) {
+        repeatTime = (float)((1000.0 * (now.time - changeTimer.time) + (now.millitm - changeTimer.millitm)) / framerate);
+        changeTimer = now;
+    }
+
     if (changed && sumInputs) {
-        fprintf(inputlog, " : %d\n", repeatedInputs);
+        if (estimateframes) fprintf(inputlog, " : %3.2f\n", repeatTime);
+        else fprintf(inputlog, " : %3d\n", repeatedInputs);
         repeatedInputs = 1;
+        changeTimer = now;
     }
+
     if (changed || !sumInputs) {
         if (snesmode) {
             fprintf(inputlog, "%s%s%s%s%s%s%s%s%s%s%s%s",

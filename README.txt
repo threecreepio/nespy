@@ -1,5 +1,7 @@
 # NESpy Input Reader
 
+https://github.com/threecreepio/nespy
+
 Windows application that can read and display NES and SNES controllers.
 
 There is also some support for Keyboards and USB Joypads.

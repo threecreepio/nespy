@@ -17,7 +17,7 @@ file(COPY NESpy.ini DESTINATION ${CMAKE_BINARY_DIR}/out)
 file(COPY keycodes.txt DESTINATION ${CMAKE_BINARY_DIR}/out)
 file(COPY firmware DESTINATION ${CMAKE_BINARY_DIR}/out)
 
-add_executable(NESpy
+add_executable(NESpy WIN32
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/glad/src/gl.c
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ini.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/inputs.c
