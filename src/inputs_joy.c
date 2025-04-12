@@ -100,18 +100,19 @@ DWORD WINAPI JOYThread(void* data)
     }
 }
 
+int log_enum = 0;
 BOOL CALLBACK JOYEnumJoypad(const DIDEVICEINSTANCE* did, void* ctx)
 {
     if (!joy_device[0] || strcmp(joy_device, did->tszInstanceName) == 0) {
-        fprintf(logfile, "using device %s\n", did->tszInstanceName);
+        if (log_enum == 1) fprintf(logfile, "using device %s\n", did->tszInstanceName);
         HRESULT result = IDirectInput8_CreateDevice(di, &did->guidInstance, &joypad, NULL);
         if (FAILED(result)) {
-            fprintf(logfile, "device failed %s\n", did->tszInstanceName);
+            if (log_enum == 1) fprintf(logfile, "device failed %s\n", did->tszInstanceName);
             return DIENUM_CONTINUE;
         }
         return DIENUM_STOP;
     }
-    fprintf(logfile, "skipping device %s\n", did->tszInstanceName);
+    if (log_enum == 1) fprintf(logfile, "skipping device %s\n", did->tszInstanceName);
     return DIENUM_CONTINUE;
 }
 
@@ -126,7 +127,8 @@ int JOYInit()
         return -2;
     }
     if (0 == joypad) {
-        fprintf(logfile, "failed to find a joypad\n");
+        if (log_enum == 0) fprintf(logfile, "failed to find a joypad\n");
+        log_enum += 1;
         return -3;
     }
     JOYConfigure();

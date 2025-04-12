@@ -288,7 +288,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
     glfwShowWindow(window);
 
-    fprintf(logfile, "waiting for input subsystem init\n");
     int errcount = 0;
     while (0 != InputStartup() && !glfwWindowShouldClose(window)) {
         showErrorFrame(window);
