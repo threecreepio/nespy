@@ -10,7 +10,7 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
       - name: configure
         working-directory: ${{github.workspace}}
-        run: cmake -G Ninja --preset release -B build
+        run: cmake -G Ninja --preset clang -B build
       - name: build
         working-directory: ${{github.workspace}}/build
         run: cmake --build .

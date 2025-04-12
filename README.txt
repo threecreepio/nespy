@@ -16,17 +16,25 @@ In the images folder there is an image called "0.png" which is the base image th
 
 When the program starts it writes to an NESpy.log file with anything that might happen during runtime. If the program crashes, look there and hopefully it wrote something useful!
 
-## Building
+## Building with Visual Studio
 
-The project is Windows-only, and requires CMake and a C compiler (LLVM Clang, TDM GCC, Visual Studio.)
+To build the project with Visual Studio, just open the folder and you should be able to compile.
 
-https://cmake.org/download/
+## Building with Ninja + Clang
 
-Create a build subdirectory, and inside it write:
+To build with Clang, make sure to install LLVM, Cmake and Clang (make sure to select to add LLVM to path during the install):
 
-cmake -DCMAKE_BUILD_TYPE=Release ..
+    winget install -i Ninja-build.Ninja LLVM.LLVM CMake
 
-This will generate build files for your system. After that you'll want to use your C compiler to build the executable.
+Navigate into the folder containing the code and write:
+
+    cmake --preset clang -B build
+
+    cmake --build build
+
+If all worked as it should, there will be a "build" folder containing an "out" folder which will have your NESpy build.
+
+After making changes you can write `cmake --build build` again to recompile.
 
 Have fun!
 
