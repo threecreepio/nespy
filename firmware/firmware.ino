@@ -33,8 +33,8 @@ void loop()
         WAIT_FALLING_EDGE(PIN_CLOCK);
         b1 |= (!PIN_READ(PIN_DATA)) ? (1 << i) : 0;
     }
-    Serial.write(b0 & 0x0F | 0x80);
-    Serial.write(b0 >> 4); // mark start byte
+    Serial.write(b0 & 0x0F | 0x80); // mark start byte
+    Serial.write(b0 >> 4);
     Serial.write(b1 & 0x0F);
     Serial.write(b1 >> 4);
     interrupts();

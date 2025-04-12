@@ -1,7 +1,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-int joynameToKeyCode(const char *input) {
+int joynameToKeyCode(const char* input)
+{
     if (0 == strcmp(input, "UP")) return 32;
     if (0 == strcmp(input, "RIGHT")) return 33;
     if (0 == strcmp(input, "DOWN")) return 34;
@@ -9,7 +10,8 @@ int joynameToKeyCode(const char *input) {
     return strtol(input, 0, 10);
 }
 
-int keynameToKeyCode(const char *input) {
+int keynameToKeyCode(const char* input)
+{
     // be prepared for some beautiful code!
     if (0 == strcmp(input, "0")) return 0x30;
     if (0 == strcmp(input, "1")) return 0x31;

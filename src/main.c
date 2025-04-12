@@ -11,7 +11,7 @@
 
 #define INPUTS 12
 
-FILE *logfile;
+FILE* logfile;
 extern const uint8_t icon_bin[];
 extern const uint32_t icon_bin_size;
 
@@ -20,16 +20,19 @@ uint32_t idlesleep = 1;
 char windowtitle[0x80] = "NESpy";
 char imagepath[0x80] = "images";
 
-struct VTexData { GLfloat pos[2]; GLfloat uv[2]; };
+struct VTexData
+{
+    GLfloat pos[2];
+    GLfloat uv[2];
+};
 static const struct VTexData vertices[] =
 {
-  { { -1.f, -1.f }, { 0.f, 1.f } },
-  { { -1.f,  1.f }, { 0.f, 0.f } },
-  { {  1.f,  1.f }, { 1.f, 0.f } },
-
-  { { -1.f, -1.f }, { 0.f, 1.f } },
-  { {  1.f,  1.f }, { 1.f, 0.f } },
-  { {  1.f, -1.f }, { 1.f, 1.f } },
+    {{-1.f, -1.f}, {0.f, 1.f}},
+    {{-1.f, 1.f}, {0.f, 0.f}},
+    {{1.f, 1.f}, {1.f, 0.f}},
+    {{-1.f, -1.f}, {0.f, 1.f}},
+    {{1.f, 1.f}, {1.f, 0.f}},
+    {{1.f, -1.f}, {1.f, 1.f}},
 };
 
 static const char* vertex_shader_text =
@@ -90,7 +93,8 @@ static void GlfwKeyCallback(GLFWwindow* window, int key, int scancode, int actio
     }
 }
 
-GLuint LoadTexture(const char *path) {
+GLuint LoadTexture(const char* path)
+{
     uint32_t error;
     uint8_t* image;
     uint32_t width, height;
@@ -112,18 +116,20 @@ GLuint LoadTexture(const char *path) {
 
 static int ReadSetting(void* user, const char* section, const char* name, const char* value)
 {
-    #define SETTING(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
     InputReadSetting(user, section, name, value);
-    if (SETTING("NESpy", "idlesleep")) idlesleep = strtol(value, NULL, 10);
-    if (SETTING("NESpy", "imagepath")) snprintf(imagepath, sizeof(imagepath), "%s", value);
-    if (SETTING("NESpy", "windowtitle")) snprintf(windowtitle, sizeof(windowtitle), "%s", value);
+    if (SETTING("NESpy", "idlesleep"))
+        idlesleep = strtol(value, NULL, 10);
+    if (SETTING("NESpy", "imagepath"))
+        snprintf(imagepath, sizeof(imagepath), "%s", value);
+    if (SETTING("NESpy", "windowtitle"))
+        snprintf(windowtitle, sizeof(windowtitle), "%s", value);
     return 0;
 }
 
-
-static void LoadIconResources(GLFWwindow *window) {
-    HGLOBAL     res_handle = NULL;
-    HRSRC       res;
+static void LoadIconResources(GLFWwindow* window)
+{
+    HGLOBAL res_handle = NULL;
+    HRSRC res;
 
     // NOTE: providing g_hInstance is important, NULL might not work
     res = FindResource(GetModuleHandle(NULL), "icon_png", RT_RCDATA);
@@ -136,19 +142,19 @@ static void LoadIconResources(GLFWwindow *window) {
         fprintf(stderr, "could not load icon handle\n");
         return;
     }
-    unsigned char *file = (unsigned char*)LockResource(res_handle);
+    unsigned char* file = (unsigned char*)LockResource(res_handle);
     DWORD len = SizeofResource(NULL, res);
 
     if (file == 0) {
         fprintf(stderr, "could not lock resource\n");
         return;
     }
-    
-    uint8_t *icondat;
+
+    uint8_t* icondat;
     uint32_t width;
     uint32_t height;
     lodepng_decode32(&icondat, &width, &height, file, len);
-    
+
     GLFWimage icons[1];
     icons[0].pixels = icondat;
     icons[0].width = width;
@@ -156,7 +162,7 @@ static void LoadIconResources(GLFWwindow *window) {
     glfwSetWindowIcon(window, 1, icons);
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     inputlog = stdout;
     if (0 != fopen_s(&logfile, "NESpy.log", "w")) {
@@ -201,7 +207,7 @@ int main(int argc, char **argv)
     glGenBuffers(1, &vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    
+
     const GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
     glCompileShader(vertex_shader);
@@ -223,13 +229,13 @@ int main(int argc, char **argv)
     glGenVertexArrays(1, &vertex_array);
     glBindVertexArray(vertex_array);
     glEnableVertexAttribArray(vpos_location);
-    glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE, sizeof(struct VTexData), (void*) offsetof(struct VTexData, pos));
+    glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE, sizeof(struct VTexData), (void*)offsetof(struct VTexData, pos));
     glEnableVertexAttribArray(vuv_location);
-    glVertexAttribPointer(vuv_location, 2, GL_FLOAT, GL_FALSE, sizeof(struct VTexData), (void*) offsetof(struct VTexData, uv));
+    glVertexAttribPointer(vuv_location, 2, GL_FLOAT, GL_FALSE, sizeof(struct VTexData), (void*)offsetof(struct VTexData, uv));
 
     glUseProgram(program);
-    GLuint textures[INPUTS+1];
-    for (int i=0; i<INPUTS+1; ++i) {
+    GLuint textures[INPUTS + 1];
+    for (int i = 0; i < INPUTS + 1; ++i) {
         char path[50];
         char attrib[50];
         sprintf(path, "%s/%i.png", imagepath, i);
@@ -239,8 +245,8 @@ int main(int argc, char **argv)
         textures[i] = LoadTexture(path);
         if (textures[i] == 0) {
             fprintf(stderr, "failed to load texture %i\n", i);
-            //glfwTerminate();
-            //return -1;
+            // glfwTerminate();
+            // return -1;
             continue;
         }
 
@@ -254,12 +260,12 @@ int main(int argc, char **argv)
         glBindTexture(GL_TEXTURE_2D, textures[i]);
         glUniform1i(glGetUniformLocation(program, attrib), i);
     }
-    
+
     fprintf(logfile, "waiting for input subsystem init\n");
     int errcount = 0;
     while (0 != InputStartup() && !glfwWindowShouldClose(window)) {
         errcount += 1;
-        for (int i=0; i<10000; ++i) {
+        for (int i = 0; i < 10000; ++i) {
             if (!glfwWindowShouldClose(window)) {
                 glClearColor(errcount % 2 > 0 ? 1.0f : 0.0f, 0.0f, 0.0f, 1.0f);
                 glClear(GL_COLOR_BUFFER_BIT);
