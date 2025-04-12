@@ -6,7 +6,7 @@ jobs:
     env:
       VCPKG_DEFAULT_TRIPLET: x64-windows
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ilammy/msvc-dev-cmd@v1
       - name: configure
         working-directory: ${{github.workspace}}/build
@@ -18,7 +18,7 @@ jobs:
         working-directory: ${{github.workspace}}/build/out
         run: zip archive.zip ./* -r
       - name: upload
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: archive.zip
-          path: ${{github.workspace}}/build/out/archive.zip
+          path: ${{github.workspace}}/build/out
