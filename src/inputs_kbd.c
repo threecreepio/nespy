@@ -1,187 +1,139 @@
-#include <windows.h>
+#include <dinput.h>
 #include <sys\timeb.h>
 #include "nespy.h"
 #include "inputs.h"
+#include <stdint.h>
 
 float kbd_framerate = 16.6393322f;
-int inputState = 0;
-int downKeys = 0;
-int kbd_lrmode, kbd_up, kbd_down, kbd_left, kbd_right, kbd_a, kbd_b, kbd_start, kbd_select;
+LPDIRECTINPUT8 kbd_di;
+LPDIRECTINPUTDEVICE8 keyboard;
+uint8_t keyboardstate[0x100];
+int kbd_up, kbd_down, kbd_left, kbd_right, kbd_a, kbd_b, kbd_start, kbd_select;
 int kbd_snes_l, kbd_snes_r, kbd_snes_a, kbd_snes_x;
 int kbd_debug = 0;
+int kbd_socd = SOCD_NEUTRAL;
 
-LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
-    KBDLLHOOKSTRUCT kbdStruct = *((KBDLLHOOKSTRUCT*)lParam);
-    int newInput = inputState;
-    
-    if (wParam == WM_KEYDOWN) {
-        if (kbdStruct.vkCode == kbd_up) {
-            downKeys |= NESKEY_UP;
-            int islr = downKeys & NESKEY_DOWN;
-            if (kbd_lrmode == KBDLR_PREFER_LATEST) {
-                newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
-            }
-            if (kbd_lrmode == KBDLR_PREFER_LEFT && islr) {
-                newInput &= 0xFFFF ^ NESKEY_DOWN;
-            }
-            newInput |= NESKEY_UP;
-            if (kbd_lrmode == KBDLR_NEUTRAL && islr) {
-                newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
-            }
-        }
-        else if (kbdStruct.vkCode == kbd_down) {
-            downKeys |= NESKEY_DOWN;
-            int islr = downKeys & NESKEY_UP;
-            if (kbd_lrmode == KBDLR_PREFER_LATEST) {
-                newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
-            }
-            if (kbd_lrmode == KBDLR_PREFER_LEFT && islr) {}
-            else newInput |= NESKEY_DOWN;
-            if (kbd_lrmode == KBDLR_NEUTRAL && islr) {
-                newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
-            }
-        }
-        else if (kbdStruct.vkCode == kbd_left) {
-            downKeys |= NESKEY_LEFT;
-            int islr = downKeys & NESKEY_RIGHT;
-            if (kbd_lrmode == KBDLR_PREFER_LATEST && islr) {
-                newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
-            }
-            if (kbd_lrmode == KBDLR_PREFER_LEFT && islr) {
-                newInput &= 0xFFFF ^ NESKEY_RIGHT;
-            }
-            newInput |= NESKEY_LEFT;
-            if (kbd_lrmode == KBDLR_NEUTRAL && islr) {
-                newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
-            }
-        }
-        else if (kbdStruct.vkCode == kbd_right) {
-            downKeys |= NESKEY_RIGHT;
-            int islr = downKeys & NESKEY_LEFT;
-            if (kbd_lrmode == KBDLR_PREFER_LATEST) {
-                newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
-            }
-            if (kbd_lrmode == KBDLR_PREFER_LEFT && islr) {}
-            else newInput |= NESKEY_RIGHT;
-            if (kbd_lrmode == KBDLR_NEUTRAL && islr) {
-                newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
-            }
-        }
-        else if (kbdStruct.vkCode == kbd_a) {
-            downKeys |= NESKEY_A;
-            newInput |= NESKEY_A;
-        }
-        else if (kbdStruct.vkCode == kbd_b) {
-            downKeys |= NESKEY_B;
-            newInput |= NESKEY_B;
-        }
-        else if (kbdStruct.vkCode == kbd_select) {
-            downKeys |= NESKEY_S;
-            newInput |= NESKEY_S;
-        }
-        else if (kbdStruct.vkCode == kbd_start) {
-            downKeys |= NESKEY_T;
-            newInput |= NESKEY_T;
-        }
-        else if (kbdStruct.vkCode == kbd_snes_l) {
-            downKeys |= NESKEY_SNES_L;
-            newInput |= NESKEY_SNES_L;
-        }
-        else if (kbdStruct.vkCode == kbd_snes_r) {
-            downKeys |= NESKEY_SNES_R;
-            newInput |= NESKEY_SNES_R;
-        }
-        else if (kbdStruct.vkCode == kbd_snes_x) {
-            downKeys |= NESKEY_SNES_X;
-            newInput |= NESKEY_SNES_X;
-        }
-        else if (kbdStruct.vkCode == kbd_snes_a) {
-            downKeys |= NESKEY_SNES_A;
-            newInput |= NESKEY_SNES_A;
-        } else {
-            return CallNextHookEx(0, nCode, wParam, lParam);
-        }
+int KBDConfigure()
+{
+    HRESULT hr;
+    if (FAILED(hr = IDirectInputDevice8_SetDataFormat(keyboard, &c_dfDIKeyboard))) {
+        return hr;
     }
-
-    if (wParam == WM_KEYUP) {
-        if (kbd_debug) {
-            printf("Key: %x\n", (int) kbdStruct.vkCode);
-        }
-        if (kbdStruct.vkCode == kbd_up) {
-            newInput = (newInput & (0xFFFF ^ NESKEY_UP)) | (downKeys & NESKEY_DOWN);
-            downKeys &= 0xFFFF ^ NESKEY_UP;
-        }
-        else if (kbdStruct.vkCode == kbd_down) {
-            newInput = (newInput & (0xFFFF ^ NESKEY_DOWN)) | (downKeys & NESKEY_UP);
-            downKeys &= 0xFFFF ^ NESKEY_DOWN;
-        }
-        else if (kbdStruct.vkCode == kbd_left) {
-            newInput = (newInput & (0xFFFF ^ NESKEY_LEFT)) | (downKeys & NESKEY_RIGHT);
-            downKeys &= 0xFFFF ^ NESKEY_LEFT;
-        }
-        else if (kbdStruct.vkCode == kbd_right) {
-            newInput = (newInput & (0xFFFF ^ NESKEY_RIGHT)) | (downKeys & NESKEY_LEFT);
-            downKeys &= 0xFFFF ^ NESKEY_RIGHT;
-        }
-        else if (kbdStruct.vkCode == kbd_a) {
-            newInput &= 0xFFFF ^ NESKEY_A;
-            downKeys &= 0xFFFF ^ NESKEY_A;
-        }
-        else if (kbdStruct.vkCode == kbd_b) {
-            newInput &= 0xFFFF ^ NESKEY_B;
-            downKeys &= 0xFFFF ^ NESKEY_B;
-        }
-        else if (kbdStruct.vkCode == kbd_select) {
-            newInput &= 0xFFFF ^ NESKEY_S;
-            downKeys &= 0xFFFF ^ NESKEY_S;
-        }
-        else if (kbdStruct.vkCode == kbd_start) {
-            newInput &= 0xFFFF ^ NESKEY_T;
-            downKeys &= 0xFFFF ^ NESKEY_T;
-        } 
-        else if (kbdStruct.vkCode == kbd_snes_l) {
-            newInput &= 0xFFFF ^ NESKEY_SNES_L;
-            downKeys &= 0xFFFF ^ NESKEY_SNES_L;
-        }
-        else if (kbdStruct.vkCode == kbd_snes_r) {
-            newInput &= 0xFFFF ^ NESKEY_SNES_R;
-            downKeys &= 0xFFFF ^ NESKEY_SNES_R;
-        }
-        else if (kbdStruct.vkCode == kbd_snes_x) {
-            newInput &= 0xFFFF ^ NESKEY_SNES_X;
-            downKeys &= 0xFFFF ^ NESKEY_SNES_X;
-        }
-        else if (kbdStruct.vkCode == kbd_snes_a) {
-            newInput &= 0xFFFF ^ NESKEY_SNES_A;
-            downKeys &= 0xFFFF ^ NESKEY_SNES_A;
-        } else {
-            return CallNextHookEx(0, nCode, wParam, lParam);
-        }
+    if (FAILED(hr = IDirectInputDevice8_SetCooperativeLevel(keyboard, NULL, DISCL_NONEXCLUSIVE | DISCL_BACKGROUND))) {
+        return hr;
     }
-
-    if (newInput == inputState) {
-        return CallNextHookEx(0, nCode, wParam, lParam);
-    }
-    
-    inputState = currentInputs = newInput;
-
-    struct timeb end;
-    ftime(&end);
-    
-    updateInputState(newInput, kbd_framerate, 1);
-    return CallNextHookEx(0, nCode, wParam, lParam);
+    return 0;
 }
 
-int KBDInit() {
+int KBDPoll(void)
+{
+    HRESULT hr;
+    hr = IDirectInputDevice8_Poll(keyboard);
+    if (FAILED(hr)) {
+        while (1) {
+            hr = IDirectInputDevice8_Acquire(keyboard);
+            if (hr == DIERR_INPUTLOST) {
+                printf("input lost: %ld\n", hr);
+                continue;
+            }
+            if ((hr == DIERR_INVALIDPARAM) || (hr == DIERR_NOTINITIALIZED)) {
+                printf("failed to access keyboard: %ld\n", hr);
+                return -1;
+            }
+            if (FAILED(hr)) {
+                printf("couldnt acquire keyboard: %ld\n", hr);
+                return -1;
+            }
+            break;
+        }
+        hr = IDirectInputDevice8_Poll(keyboard);
+        if (FAILED(hr)) {
+            printf("couldnt poll keyboard: %ld\n", hr);
+            return -1;
+        }
+    }
+    IDirectInputDevice8_GetDeviceState(keyboard, 0x100, &keyboardstate);
+    return 0;
+}
+
+DWORD WINAPI KBDThread(void* data)
+{
+    HANDLE updateEvent = CreateEvent(NULL, FALSE, FALSE, "Update");
+    if (updateEvent == NULL) {
+        printf("failed to create update event.\n");
+        exit(-2);
+    }
+    IDirectInputDevice8_SetEventNotification(keyboard, updateEvent);
+    while (1) {
+        if (KBDPoll() != 0) {
+            exit(-2);
+        }
+        if (kbd_debug) {
+            for (int i=0; i<0x100; ++i) {
+                if (keyboardstate[i]) {
+                    fprintf(stdout, "pressed input: $%02X\n", i);
+                }
+            }
+        }
+        int result = 0;
+        result = result | (keyboardstate[kbd_a] > 0 ? 0b000000000001 : 0);
+        result = result | (keyboardstate[kbd_b] > 0 ? 0b000000000010 : 0);
+        result = result | (keyboardstate[kbd_start] > 0 ? 0b000000000100 : 0);
+        result = result | (keyboardstate[kbd_select] > 0 ? 0b000000001000 : 0);
+        result = result | (keyboardstate[kbd_up] > 0 ? 0b000000010000 : 0);
+        result = result | (keyboardstate[kbd_down] > 0 ? 0b000000100000 : 0);
+        result = result | (keyboardstate[kbd_left] > 0 ? 0b000001000000 : 0);
+        result = result | (keyboardstate[kbd_right] > 0 ? 0b000010000000 : 0);
+        result = result | (keyboardstate[kbd_snes_a] > 0 ? 0b000100000000 : 0);
+        result = result | (keyboardstate[kbd_snes_x] > 0 ? 0b001000000000 : 0);
+        result = result | (keyboardstate[kbd_snes_r] > 0 ? 0b010000000000 : 0);
+        result = result | (keyboardstate[kbd_snes_l] > 0 ? 0b100000000000 : 0);
+        result = handleSOCD(result);
+        updateInputState(result, kbd_framerate, 1);
+    }
+}
+
+BOOL CALLBACK KBDEnumDevices(const DIDEVICEINSTANCE* did, void* ctx)
+{
+    fprintf(logfile, "using device %s\n", did->tszInstanceName);
+    HRESULT result = IDirectInput8_CreateDevice(kbd_di, &did->guidInstance, &keyboard, NULL);
+    if (FAILED(result)) {
+        fprintf(logfile, "device failed %s\n", did->tszInstanceName);
+        return DIENUM_CONTINUE;
+    }
+    return DIENUM_STOP;
+}
+
+int KBDInit()
+{
     inputErrorCode = 1;
-    SetWindowsHookEx(WH_KEYBOARD_LL, KBDCallback, NULL, 0);
+    keyboard = 0;
+    if (FAILED(DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION, &IID_IDirectInput8, (void**)&kbd_di, NULL))) {
+        return -1;
+    }
+    if (FAILED(IDirectInput8_EnumDevices(kbd_di, DI8DEVCLASS_KEYBOARD, KBDEnumDevices, GetModuleHandle(NULL), DIEDFL_ATTACHEDONLY))) {
+        return -2;
+    }
+    if (0 == keyboard) {
+        fprintf(logfile, "failed to find a keyboard\n");
+        return -3;
+    }
+    KBDConfigure();
+    KBDPoll();
+    HANDLE thread = CreateThread(NULL, 0, KBDThread, NULL, 0, NULL);
+    if (!thread) {
+        fprintf(logfile, "could not spawn thread\n");
+        return -4;
+    }
+    
     inputErrorCode = 0;
     return 0;
 }
 
-int KBDInputReadSetting(void* user, const char* section, const char* name, const char* value) {
+int KBDInputReadSetting(void* user, const char* section, const char* name, const char* value)
+{
     if (SETTING("KEYBOARD", "fps")) kbd_framerate = 1000.0f / strtof(value, NULL);
-    if (SETTING("KEYBOARD", "lrmode")) kbd_lrmode = strtol(value, NULL, 10);
+    if (SETTING("KEYBOARD", "socd")) kbd_socd = strtol(value, NULL, 10);
     if (SETTING("KEYBOARD", "debug")) kbd_debug = strtol(value, NULL, 10);
     if (SETTING("KEYBOARD", "up")) kbd_up = keynameToKeyCode(value);
     if (SETTING("KEYBOARD", "down")) kbd_down = keynameToKeyCode(value);
@@ -191,7 +143,7 @@ int KBDInputReadSetting(void* user, const char* section, const char* name, const
     if (SETTING("KEYBOARD", "b")) kbd_b = keynameToKeyCode(value);
     if (SETTING("KEYBOARD", "start")) kbd_start = keynameToKeyCode(value);
     if (SETTING("KEYBOARD", "select")) kbd_select = keynameToKeyCode(value);
-
+    
     if (snesmode) {
         if (SETTING("KEYBOARD", "y")) kbd_a = keynameToKeyCode(value);
         if (SETTING("KEYBOARD", "a")) kbd_snes_a = keynameToKeyCode(value);
@@ -199,6 +151,6 @@ int KBDInputReadSetting(void* user, const char* section, const char* name, const
         if (SETTING("KEYBOARD", "r")) kbd_snes_r = keynameToKeyCode(value);
         if (SETTING("KEYBOARD", "x")) kbd_snes_x = keynameToKeyCode(value);
     }
-    
+
     return 0;
 }

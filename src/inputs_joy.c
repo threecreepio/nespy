@@ -12,7 +12,6 @@ DIDEVCAPS joypadcaps;
 byte btnstate[32 + 4];
 int joy_up, joy_down, joy_left, joy_right, joy_a, joy_b, joy_start, joy_select;
 int joy_snes_l, joy_snes_r, joy_snes_a, joy_snes_x;
-int joy_debug = 0;
 
 int JOYConfigure()
 {
@@ -67,8 +66,8 @@ DWORD WINAPI JOYThread(void* data)
 {
     HANDLE updateEvent = CreateEvent(NULL, FALSE, FALSE, "Update");
     if (updateEvent == NULL) {
-        printf("failed to create event..\n");
-        return -2;
+        printf("failed to create update event.\n");
+        exit(-2);
     }
     IDirectInputDevice8_SetEventNotification(joypad, updateEvent);
     byte buttons[32 + 4];
@@ -96,6 +95,8 @@ DWORD WINAPI JOYThread(void* data)
         result = result | (buttons[joy_snes_x] > 0 ? 0b001000000000 : 0);
         result = result | (buttons[joy_snes_r] > 0 ? 0b010000000000 : 0);
         result = result | (buttons[joy_snes_l] > 0 ? 0b100000000000 : 0);
+        result = handleSOCD(result);
+
         if (result == currentInputs) continue;
         updateInputState(result, joy_framerate, 1);
     }
@@ -103,7 +104,7 @@ DWORD WINAPI JOYThread(void* data)
 
 BOOL CALLBACK JOYEnumJoypad(const DIDEVICEINSTANCE* did, void* ctx)
 {
-    if (strcmp(joy_device, did->tszInstanceName) == 0) {
+    if (!joy_device[0] || strcmp(joy_device, did->tszInstanceName) == 0) {
         fprintf(logfile, "using device %s\n", did->tszInstanceName);
         HRESULT result = IDirectInput8_CreateDevice(di, &did->guidInstance, &joypad, NULL);
         if (FAILED(result)) {
@@ -146,7 +147,6 @@ int JOYInputReadSetting(void* user, const char* section, const char* name, const
 {
     if (SETTING("JOYPAD", "fps")) joy_framerate = 1000.0f / strtof(value, NULL);
     if (SETTING("JOYPAD", "device")) snprintf(joy_device, sizeof(joy_device), "%s", value);
-    if (SETTING("JOYPAD", "debug")) joy_debug = strtol(value, NULL, 10);
     if (SETTING("JOYPAD", "up")) joy_up = joynameToKeyCode(value);
     if (SETTING("JOYPAD", "down")) joy_down = joynameToKeyCode(value);
     if (SETTING("JOYPAD", "left")) joy_left = joynameToKeyCode(value);
@@ -157,11 +157,12 @@ int JOYInputReadSetting(void* user, const char* section, const char* name, const
     if (SETTING("JOYPAD", "select")) joy_select = joynameToKeyCode(value);
     
     if (snesmode) {
-        if (SETTING("KEYBOARD", "y")) joy_a = keynameToKeyCode(value);
-        if (SETTING("KEYBOARD", "a")) joy_snes_a = keynameToKeyCode(value);
-        if (SETTING("KEYBOARD", "l")) joy_snes_l = keynameToKeyCode(value);
-        if (SETTING("KEYBOARD", "r")) joy_snes_r = keynameToKeyCode(value);
-        if (SETTING("KEYBOARD", "x")) joy_snes_x = keynameToKeyCode(value);
+        if (SETTING("JOYPAD", "y")) joy_a = joynameToKeyCode(value);
+        if (SETTING("JOYPAD", "a")) joy_snes_a = joynameToKeyCode(value);
+        if (SETTING("JOYPAD", "l")) joy_snes_l = joynameToKeyCode(value);
+        if (SETTING("JOYPAD", "r")) joy_snes_r = joynameToKeyCode(value);
+        if (SETTING("JOYPAD", "x")) joy_snes_x = joynameToKeyCode(value);
     }
+
     return 0;
 }

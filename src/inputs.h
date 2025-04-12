@@ -12,10 +12,8 @@
 #define NESKEY_SNES_L 0x400
 #define NESKEY_SNES_R 0x800
 
-#define KBDLR_NONE 0
-#define KBDLR_PREFER_LATEST 1
-#define KBDLR_NEUTRAL 2
-#define KBDLR_PREFER_LEFT 3
+#define SOCD_DISABLED 0
+#define SOCD_NEUTRAL 1
 
 extern int snesmode;
 extern int inputErrorCode;
@@ -23,6 +21,7 @@ extern int inputErrorCode;
 int joynameToKeyCode(const char *input);
 int keynameToKeyCode(const char *input);
 void updateInputState(int newInput, float framerate, int estimateframes);
+int handleSOCD(int newInputs);
 
 int InputStartup();
 

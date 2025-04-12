@@ -16,6 +16,19 @@ struct timeb currentTimer;
 int currentInputs;
 int repeatedInputs = 0;
 int sumInputs = 1;
+int socd = SOCD_DISABLED;
+
+int handleSOCD(int newInputs) {
+    if (socd == SOCD_DISABLED) return newInputs;
+    int outInputs = newInputs;
+    if ((newInputs & 0b00110000) == 0b00110000) { // U+D
+        outInputs &= 0b1111111111001111;
+    }
+    if ((newInputs & 0b11000000) == 0b11000000) { // L+R
+        outInputs &= 0b1111111100111111;
+    }
+    return outInputs;
+}
 
 void updateInputState(int newInput, float framerate, int estimateframes) {
     uint8_t changed = currentInputs != newInput;
@@ -74,6 +87,7 @@ int InputReadSetting(void* user, const char* section, const char* name, const ch
     if (SETTING("NESpy", "inputtype")) snprintf(inputtype, sizeof(inputtype), "%s", value);
     if (SETTING("NESpy", "snesmode")) snesmode = strtol(value, NULL, 10);
     if (SETTING("NESpy", "suminputs")) sumInputs = strtol(value, NULL, 10);
+    if (SETTING("NESpy", "socd")) socd = strtol(value, NULL, 10);
     NESInputReadSetting(user, section, name, value);
     JOYInputReadSetting(user, section, name, value);
     KBDInputReadSetting(user, section, name, value);
