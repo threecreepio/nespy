@@ -4,7 +4,6 @@
 #include "nespy.h"
 #include "inputs.h"
 
-int nes_suminputs = 0;
 char comport[50] = "";
 
 DWORD WINAPI NESThread(void* data);
@@ -101,7 +100,5 @@ int NESInputReadSetting(void* user, const char* section, const char* name, const
 {
     if (SETTING("NES", "comport"))
         snprintf(comport, sizeof(comport), "%s", value);
-    if (SETTING("NES", "suminputs"))
-        nes_suminputs = strtol(value, NULL, 10);
     return 0;
 }
