@@ -1,0 +1,24 @@
+name: "Windows build"
+on: push
+jobs:
+  win-build:
+    runs-on: windows-2022
+    env:
+      VCPKG_DEFAULT_TRIPLET: x64-windows
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: configure
+        working-directory: ${{github.workspace}}/build
+        run: cmake -G Ninja --preset release -B build
+      - name: build
+        working-directory: ${{github.workspace}}/build/out
+        run: cmake --build .
+      - name: Zip output
+        working-directory: ${{github.workspace}}/build/out
+        run: zip archive.zip ./* -r
+      - name: upload
+        uses: actions/upload-artifact@v1
+        with:
+          name: archive.zip
+          path: ${{github.workspace}}/build/out/archive.zip

@@ -4,7 +4,6 @@
 #include "inputs.h"
 #include <stdint.h>
 
-float kbd_framerate = 16.6393322f;
 LPDIRECTINPUT8 kbd_di;
 LPDIRECTINPUTDEVICE8 keyboard;
 uint8_t keyboardstate[0x100];
@@ -69,7 +68,7 @@ DWORD WINAPI KBDThread(void* data)
             exit(-2);
         }
         if (kbd_debug) {
-            for (int i=0; i<0x100; ++i) {
+            for (int i = 0; i < 0x100; ++i) {
                 if (keyboardstate[i]) {
                     fprintf(stdout, "pressed input: $%02X\n", i);
                 }
@@ -89,7 +88,7 @@ DWORD WINAPI KBDThread(void* data)
         result = result | (keyboardstate[kbd_snes_r] > 0 ? 0b010000000000 : 0);
         result = result | (keyboardstate[kbd_snes_l] > 0 ? 0b100000000000 : 0);
         result = handleSOCD(result);
-        updateInputState(result, kbd_framerate, 1);
+        updateInputState(result, 1);
     }
 }
 
@@ -125,15 +124,13 @@ int KBDInit()
         fprintf(logfile, "could not spawn thread\n");
         return -4;
     }
-    
+
     inputErrorCode = 0;
     return 0;
 }
 
 int KBDInputReadSetting(void* user, const char* section, const char* name, const char* value)
 {
-    if (SETTING("KEYBOARD", "fps")) kbd_framerate = 1000.0f / strtof(value, NULL);
-    if (SETTING("KEYBOARD", "socd")) kbd_socd = strtol(value, NULL, 10);
     if (SETTING("KEYBOARD", "debug")) kbd_debug = strtol(value, NULL, 10);
     if (SETTING("KEYBOARD", "up")) kbd_up = keynameToKeyCode(value);
     if (SETTING("KEYBOARD", "down")) kbd_down = keynameToKeyCode(value);
@@ -143,7 +140,7 @@ int KBDInputReadSetting(void* user, const char* section, const char* name, const
     if (SETTING("KEYBOARD", "b")) kbd_b = keynameToKeyCode(value);
     if (SETTING("KEYBOARD", "start")) kbd_start = keynameToKeyCode(value);
     if (SETTING("KEYBOARD", "select")) kbd_select = keynameToKeyCode(value);
-    
+
     if (snesmode) {
         if (SETTING("KEYBOARD", "y")) kbd_a = keynameToKeyCode(value);
         if (SETTING("KEYBOARD", "a")) kbd_snes_a = keynameToKeyCode(value);

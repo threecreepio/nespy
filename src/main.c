@@ -121,6 +121,8 @@ static int ReadSetting(void* user, const char* section, const char* name, const 
         idlesleep = strtol(value, NULL, 10);
     if (SETTING("NESpy", "imagepath"))
         snprintf(imagepath, sizeof(imagepath), "%s", value);
+    if (SETTING("NESpy", "imagefolder"))
+        snprintf(imagepath, sizeof(imagepath), "%s", value);
     if (SETTING("NESpy", "windowtitle"))
         snprintf(windowtitle, sizeof(windowtitle), "%s", value);
     return 0;
@@ -162,8 +164,9 @@ static void LoadIconResources(GLFWwindow* window)
     glfwSetWindowIcon(window, 1, icons);
 }
 
-void showErrorFrame(GLFWwindow *window) {
-    int time = (int) glfwGetTime();
+void showErrorFrame(GLFWwindow* window)
+{
+    int time = (int)glfwGetTime();
     glClearColor(time % 2 > 0 ? 1.0f : 0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     glFinish();

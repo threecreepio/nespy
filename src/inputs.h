@@ -1,7 +1,7 @@
 #pragma once
-#define NESKEY_UP    0x010
-#define NESKEY_DOWN  0x020
-#define NESKEY_LEFT  0x040
+#define NESKEY_UP 0x010
+#define NESKEY_DOWN 0x020
+#define NESKEY_LEFT 0x040
 #define NESKEY_RIGHT 0x080
 #define NESKEY_A 0x001
 #define NESKEY_B 0x002
@@ -20,7 +20,7 @@ extern int inputErrorCode;
 
 int joynameToKeyCode(const char *input);
 int keynameToKeyCode(const char *input);
-void updateInputState(int newInput, float framerate, int estimateframes);
+void updateInputState(int newInput, int estimateframes);
 int handleSOCD(int newInputs);
 
 int InputStartup();
@@ -29,7 +29,7 @@ int KBDInit();
 int NESInit();
 int JOYInit();
 
-int InputReadSetting(void* user, const char* section, const char* name, const char* value);
-int NESInputReadSetting(void* user, const char* section, const char* name, const char* value);
-int JOYInputReadSetting(void* user, const char* section, const char* name, const char* value);
-int KBDInputReadSetting(void* user, const char* section, const char* name, const char* value);
+int InputReadSetting(void *user, const char *section, const char *name, const char *value);
+int NESInputReadSetting(void *user, const char *section, const char *name, const char *value);
+int JOYInputReadSetting(void *user, const char *section, const char *name, const char *value);
+int KBDInputReadSetting(void *user, const char *section, const char *name, const char *value);

@@ -10,15 +10,17 @@
 char inputtype[50] = "NES";
 int snesmode = 0;
 int inputErrorCode = 0;
-FILE *inputlog;
+FILE* inputlog;
 struct timeb currentTimer;
 
 int currentInputs;
 int repeatedInputs = 0;
 int sumInputs = 1;
 int socd = SOCD_DISABLED;
+float framerate = 16.6393322f;
 
-int handleSOCD(int newInputs) {
+int handleSOCD(int newInputs)
+{
     if (socd == SOCD_DISABLED) return newInputs;
     int outInputs = newInputs;
     if ((newInputs & 0b00110000) == 0b00110000) { // U+D
@@ -30,7 +32,8 @@ int handleSOCD(int newInputs) {
     return outInputs;
 }
 
-void updateInputState(int newInput, float framerate, int estimateframes) {
+void updateInputState(int newInput, int estimateframes)
+{
     uint8_t changed = currentInputs != newInput;
     currentInputs = newInput;
     struct timeb now;
@@ -65,7 +68,8 @@ void updateInputState(int newInput, float framerate, int estimateframes) {
                 (newInput & NESKEY_B) == NESKEY_B ? "B" : " ",
                 (newInput & NESKEY_A) == NESKEY_A ? "Y" : " "
             );
-        } else {
+        }
+        else {
             fprintf(inputlog, "%s%s%s%s%s%s%s%s",
                 (newInput & NESKEY_RIGHT) == NESKEY_RIGHT ? "R" : " ",
                 (newInput & NESKEY_LEFT) == NESKEY_LEFT ? "L" : " ",
@@ -83,23 +87,28 @@ void updateInputState(int newInput, float framerate, int estimateframes) {
     }
 }
 
-int InputReadSetting(void* user, const char* section, const char* name, const char* value) {
+int InputReadSetting(void* user, const char* section, const char* name, const char* value)
+{
     if (SETTING("NESpy", "inputtype")) snprintf(inputtype, sizeof(inputtype), "%s", value);
     if (SETTING("NESpy", "snesmode")) snesmode = strtol(value, NULL, 10);
     if (SETTING("NESpy", "suminputs")) sumInputs = strtol(value, NULL, 10);
     if (SETTING("NESpy", "socd")) socd = strtol(value, NULL, 10);
+    if (SETTING("NESpy", "fps")) framerate = 1000.0f / strtof(value, NULL);
     NESInputReadSetting(user, section, name, value);
     JOYInputReadSetting(user, section, name, value);
     KBDInputReadSetting(user, section, name, value);
     return 0;
 }
 
-int InputStartup() {
+int InputStartup()
+{
     if (strcmp(inputtype, "NES") == 0) {
         return NESInit();
-    } else if (strcmp(inputtype, "JOYPAD") == 0) {
+    }
+    else if (strcmp(inputtype, "JOYPAD") == 0) {
         return JOYInit();
-    } else {
+    }
+    else {
         return KBDInit();
     }
 }

@@ -4,7 +4,6 @@
 #include "inputs.h"
 
 char joy_device[256] = "";
-float joy_framerate = 16.6393322f;
 LPDIRECTINPUT8 di;
 LPDIRECTINPUTDEVICE8 joypad;
 DIJOYSTATE2 joypadstate;
@@ -27,7 +26,7 @@ int JOYConfigure()
     if (FAILED(hr = IDirectInputDevice8_GetCapabilities(joypad, &joypadcaps))) {
         return hr;
     }
-    
+
     return 0;
 }
 
@@ -98,7 +97,7 @@ DWORD WINAPI JOYThread(void* data)
         result = handleSOCD(result);
 
         if (result == currentInputs) continue;
-        updateInputState(result, joy_framerate, 1);
+        updateInputState(result, 1);
     }
 }
 
@@ -138,14 +137,13 @@ int JOYInit()
         fprintf(logfile, "could not spawn thread\n");
         return -4;
     }
-    
+
     inputErrorCode = 0;
     return 0;
 }
 
 int JOYInputReadSetting(void* user, const char* section, const char* name, const char* value)
 {
-    if (SETTING("JOYPAD", "fps")) joy_framerate = 1000.0f / strtof(value, NULL);
     if (SETTING("JOYPAD", "device")) snprintf(joy_device, sizeof(joy_device), "%s", value);
     if (SETTING("JOYPAD", "up")) joy_up = joynameToKeyCode(value);
     if (SETTING("JOYPAD", "down")) joy_down = joynameToKeyCode(value);
@@ -155,7 +153,7 @@ int JOYInputReadSetting(void* user, const char* section, const char* name, const
     if (SETTING("JOYPAD", "b")) joy_b = joynameToKeyCode(value);
     if (SETTING("JOYPAD", "start")) joy_start = joynameToKeyCode(value);
     if (SETTING("JOYPAD", "select")) joy_select = joynameToKeyCode(value);
-    
+
     if (snesmode) {
         if (SETTING("JOYPAD", "y")) joy_a = joynameToKeyCode(value);
         if (SETTING("JOYPAD", "a")) joy_snes_a = joynameToKeyCode(value);

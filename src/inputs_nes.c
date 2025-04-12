@@ -4,9 +4,7 @@
 #include "nespy.h"
 #include "inputs.h"
 
-float nes_framerate = 16.6393322f;
 int nes_suminputs = 0;
-int nes_ignoreextrareads = 1;
 char comport[50] = "";
 
 DWORD WINAPI NESThread(void* data);
@@ -88,9 +86,9 @@ DWORD WINAPI NESThread(void* data)
             if (!readlen) {
                 continue;
             }
-            updateInputState(b1 & 0xF | (b2 << 4) | (b3 << 8) | (b4 << 12), nes_framerate, 0);
+            updateInputState(b1 & 0xF | (b2 << 4) | (b3 << 8) | (b4 << 12), 0);
         }
-        
+
         // if we fall out to here, we need to reconnect to the device
         inputErrorCode = 1;
         Sleep(2500);
@@ -103,8 +101,6 @@ int NESInputReadSetting(void* user, const char* section, const char* name, const
 {
     if (SETTING("NES", "comport"))
         snprintf(comport, sizeof(comport), "%s", value);
-    if (SETTING("NES", "ignoreextrareads"))
-        nes_ignoreextrareads = strtol(value, NULL, 10);
     if (SETTING("NES", "suminputs"))
         nes_suminputs = strtol(value, NULL, 10);
     return 0;
