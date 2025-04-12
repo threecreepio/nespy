@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ilammy/msvc-dev-cmd@v1
       - name: configure
-        working-directory: ${{github.workspace}}/build
+        working-directory: ${{github.workspace}}
         run: cmake -G Ninja --preset release -B build
       - name: build
         working-directory: ${{github.workspace}}/build
