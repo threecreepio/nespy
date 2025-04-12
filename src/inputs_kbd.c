@@ -18,52 +18,52 @@ LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
         if (kbdStruct.vkCode == kbd_up) {
             downKeys |= NESKEY_UP;
             int islr = downKeys & NESKEY_DOWN;
-            if (kbd_lrmode == KBDLR_BIZHAWK) {
+            if (kbd_lrmode == KBDLR_PREFER_LATEST) {
                 newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
             }
-            if (kbd_lrmode == KBDLR_MESEN && islr) {
+            if (kbd_lrmode == KBDLR_PREFER_LEFT && islr) {
                 newInput &= 0xFFFF ^ NESKEY_DOWN;
             }
             newInput |= NESKEY_UP;
-            if (kbd_lrmode == KBDLR_FCEUX && islr) {
+            if (kbd_lrmode == KBDLR_NEUTRAL && islr) {
                 newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
             }
         }
         else if (kbdStruct.vkCode == kbd_down) {
             downKeys |= NESKEY_DOWN;
             int islr = downKeys & NESKEY_UP;
-            if (kbd_lrmode == KBDLR_BIZHAWK) {
+            if (kbd_lrmode == KBDLR_PREFER_LATEST) {
                 newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
             }
-            if (kbd_lrmode == KBDLR_MESEN && islr) {}
+            if (kbd_lrmode == KBDLR_PREFER_LEFT && islr) {}
             else newInput |= NESKEY_DOWN;
-            if (kbd_lrmode == KBDLR_FCEUX && islr) {
+            if (kbd_lrmode == KBDLR_NEUTRAL && islr) {
                 newInput &= 0xFFFF ^ (NESKEY_UP | NESKEY_DOWN);
             }
         }
         else if (kbdStruct.vkCode == kbd_left) {
             downKeys |= NESKEY_LEFT;
             int islr = downKeys & NESKEY_RIGHT;
-            if (kbd_lrmode == KBDLR_BIZHAWK && islr) {
+            if (kbd_lrmode == KBDLR_PREFER_LATEST && islr) {
                 newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
             }
-            if (kbd_lrmode == KBDLR_MESEN && islr) {
+            if (kbd_lrmode == KBDLR_PREFER_LEFT && islr) {
                 newInput &= 0xFFFF ^ NESKEY_RIGHT;
             }
             newInput |= NESKEY_LEFT;
-            if (kbd_lrmode == KBDLR_FCEUX && islr) {
+            if (kbd_lrmode == KBDLR_NEUTRAL && islr) {
                 newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
             }
         }
         else if (kbdStruct.vkCode == kbd_right) {
             downKeys |= NESKEY_RIGHT;
             int islr = downKeys & NESKEY_LEFT;
-            if (kbd_lrmode == KBDLR_BIZHAWK) {
+            if (kbd_lrmode == KBDLR_PREFER_LATEST) {
                 newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
             }
-            if (kbd_lrmode == KBDLR_MESEN && islr) {}
+            if (kbd_lrmode == KBDLR_PREFER_LEFT && islr) {}
             else newInput |= NESKEY_RIGHT;
-            if (kbd_lrmode == KBDLR_FCEUX && islr) {
+            if (kbd_lrmode == KBDLR_NEUTRAL && islr) {
                 newInput &= 0xFFFF ^ (NESKEY_LEFT | NESKEY_RIGHT);
             }
         }

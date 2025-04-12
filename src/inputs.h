@@ -13,9 +13,9 @@
 #define NESKEY_SNES_R 0x800
 
 #define KBDLR_NONE 0
-#define KBDLR_BIZHAWK 1
-#define KBDLR_FCEUX 2
-#define KBDLR_MESEN 3
+#define KBDLR_PREFER_LATEST 1
+#define KBDLR_NEUTRAL 2
+#define KBDLR_PREFER_LEFT 3
 
 extern int snesmode;
 extern int inputErrorCode;
