@@ -173,7 +173,9 @@ LRESULT __stdcall KBDCallback(int nCode, WPARAM wParam, LPARAM lParam) {
 }
 
 int KBDInit() {
+    inputErrorCode = 1;
     SetWindowsHookEx(WH_KEYBOARD_LL, KBDCallback, NULL, 0);
+    inputErrorCode = 0;
     return 0;
 }
 

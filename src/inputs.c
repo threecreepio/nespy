@@ -9,6 +9,7 @@
 
 char inputtype[50] = "NES";
 int snesmode = 0;
+int inputErrorCode = 0;
 FILE *inputlog;
 struct timeb currentTimer;
 

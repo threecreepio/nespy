@@ -18,6 +18,7 @@
 #define KBDLR_MESEN 3
 
 extern int snesmode;
+extern int inputErrorCode;
 
 int joynameToKeyCode(const char *input);
 int keynameToKeyCode(const char *input);

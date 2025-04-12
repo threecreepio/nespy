@@ -28,6 +28,7 @@ int JOYConfigure()
     if (FAILED(hr = IDirectInputDevice8_GetCapabilities(joypad, &joypadcaps))) {
         return hr;
     }
+    
     return 0;
 }
 
@@ -117,6 +118,7 @@ BOOL CALLBACK JOYEnumJoypad(const DIDEVICEINSTANCE* did, void* ctx)
 
 int JOYInit()
 {
+    inputErrorCode = 1;
     joypad = 0;
     if (FAILED(DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION, &IID_IDirectInput8, (void**)&di, NULL))) {
         return -1;
@@ -135,6 +137,8 @@ int JOYInit()
         fprintf(logfile, "could not spawn thread\n");
         return -4;
     }
+    
+    inputErrorCode = 0;
     return 0;
 }
 

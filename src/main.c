@@ -162,6 +162,14 @@ static void LoadIconResources(GLFWwindow* window)
     glfwSetWindowIcon(window, 1, icons);
 }
 
+void showErrorFrame(GLFWwindow *window) {
+    int time = (int) glfwGetTime();
+    glClearColor(time % 2 > 0 ? 1.0f : 0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glFinish();
+    glfwPollEvents();
+}
+
 int main(int argc, char** argv)
 {
     inputlog = stdout;
@@ -264,23 +272,18 @@ int main(int argc, char** argv)
     fprintf(logfile, "waiting for input subsystem init\n");
     int errcount = 0;
     while (0 != InputStartup() && !glfwWindowShouldClose(window)) {
-        errcount += 1;
-        for (int i = 0; i < 10000; ++i) {
-            if (!glfwWindowShouldClose(window)) {
-                glClearColor(errcount % 2 > 0 ? 1.0f : 0.0f, 0.0f, 0.0f, 1.0f);
-                glClear(GL_COLOR_BUFFER_BIT);
-                glFinish();
-                glfwPollEvents();
-            }
-        }
+        showErrorFrame(window);
     }
 
-    uint8_t renderedControllerValue;
     glfwSwapInterval(0);
 
     while (!glfwWindowShouldClose(window)) {
+        if (inputErrorCode != 0) {
+            showErrorFrame(window);
+            Sleep(100);
+            continue;
+        }
         int current = currentInputs;
-        renderedControllerValue = current;
         glUniform1i(keys_location, currentInputs);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glFinish();
